@@ -38,11 +38,8 @@ export async function POST(req: Request) {
       )
     );
 
-    // Update the legacy isRead boolean for backward compatibility
-    await prisma.message.updateMany({
-      where: { id: { in: messages.map(m => m.id) } },
-      data: { isRead: true }
-    });
+    // Removed legacy isRead boolean update for backward compatibility 
+    // because the new schema handles it via messageReadReceipts
 
     const channelName = `chat_${coupleId}`;
     supabase.channel(channelName).send({
