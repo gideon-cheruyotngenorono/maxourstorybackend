@@ -7,7 +7,15 @@ import { cookies } from 'next/headers';
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    let body: any
+    try {
+      body = await req.json();
+    } catch (jsonErr: any) {
+      // Malformed or empty JSON
+      console.error('[AUTH_REGISTER] failed to parse JSON body', { message: jsonErr?.message });
+      return NextResponse.json({ error: 'Invalid or empty JSON body' }, { status: 400 });
+    }
+
     const parsed = registerSchema.safeParse(body);
 
     if (!parsed.success) {
