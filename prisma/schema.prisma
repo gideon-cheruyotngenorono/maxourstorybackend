@@ -27,9 +27,13 @@ model User {
   notesCreated        Note[]
   passwordResetTokens PasswordResetToken[]
   prayersCreated      Prayer[]
-  reflections         Reflection[]
-  timelineEvents      TimelineEvent[]
+  reflections          Reflection[]
+  timelineEvents       TimelineEvent[]
   notificationSettings UserNotificationSettings?
+  role                 String               @default("user")
+  isActive             Boolean              @default(true)
+  auditLogs            AdminAuditLog[]      @relation("AdminAction")
+  announcements        Announcement[]       @relation("AdminAnnouncements")
 }
 
 model PasswordResetToken {
@@ -285,4 +289,39 @@ model CoupleFavoriteVerse {
   couple    Couple   @relation(fields: [coupleId], references: [id], onDelete: Cascade)
 
   @@unique([coupleId, verseId])
+}
+
+model ContentReport {
+  id           String   @id @default(uuid())
+  reporterId   String
+  contentType  String
+  contentId    String
+  reason       String
+  status       String   @default("pending") // pending/resolved/dismissed
+  adminNotes   String?
+  resolvedById String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Announcement {
+  id          String   @id @default(uuid())
+  title       String
+  message     String
+  priority    String   @default("low") // low/medium/high
+  createdById String
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  createdBy   User     @relation("AdminAnnouncements", fields: [createdById], references: [id])
+}
+
+model AdminAuditLog {
+  id         String   @id @default(uuid())
+  adminId    String
+  action     String
+  targetType String
+  targetId   String?
+  details    Json?
+  createdAt  DateTime @default(now())
+  admin      User     @relation("AdminAction", fields: [adminId], references: [id])
 }

@@ -64,12 +64,87 @@ TO authenticated
 WITH CHECK ( bucket_id = 'chat-media' );
 
 
--- 4. Enable Realtime Broadcasts on Message and Notification
--- Prisma table names are often quoted as "Message"
-BEGIN;
-  DROP PUBLICATION IF EXISTS supabase_realtime CASCADE;
-  CREATE PUBLICATION supabase_realtime;
-COMMIT;
+-- 5. Admin Specific Tables
+-- content_reports table
+CREATE TABLE IF NOT EXISTS "ContentReport" (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    reporter_id UUID NOT NULL,
+    content_type TEXT NOT NULL,
+    content_id UUID NOT NULL,
+    reason TEXT NOT NULL,
+    status TEXT DEFAULT 'pending', -- pending/resolved/dismissed
+    admin_notes TEXT,
+    resolved_by UUID,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
 
-ALTER PUBLICATION supabase_realtime ADD TABLE "Message";
-ALTER PUBLICATION supabase_realtime ADD TABLE "Notification";
+-- announcements table
+CREATE TABLE IF NOT EXISTS "Announcement" (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    priority TEXT DEFAULT 'low', -- low/medium/high
+    created_by UUID NOT NULL,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+-- admin_audit_log table
+CREATE TABLE IF NOT EXISTS "AdminAuditLog" (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    admin_id UUID NOT NULL,
+    action TEXT NOT NULL,
+    target_type TEXT NOT NULL,
+    target_id UUID,
+    details JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+-- 6. Admin Role Security Policies
+-- Enable RLS on Admin tables
+ALTER TABLE "ContentReport" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Announcement" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "AdminAuditLog" ENABLE ROW LEVEL SECURITY;
+
+-- Note: Policies below assume a "role" column in profiles or user table. 
+-- In our setup, "public.User" contains 'role'.
+
+DROP POLICY IF EXISTS "Admin Only Access Reports" ON "ContentReport";
+CREATE POLICY "Admin Only Access Reports"
+ON "ContentReport" FOR ALL
+TO authenticated
+USING ( 
+    EXISTS (
+        SELECT 1 FROM "User" 
+        WHERE id = auth.uid() AND role = 'admin'
+    )
+);
+
+DROP POLICY IF EXISTS "Admin Only Access Audit Logs" ON "AdminAuditLog";
+CREATE POLICY "Admin Only Access Audit Logs"
+ON "AdminAuditLog" FOR ALL
+TO authenticated
+USING ( 
+    EXISTS (
+        SELECT 1 FROM "User" 
+        WHERE id = auth.uid() AND role = 'admin'
+    )
+);
+
+-- Announcements: Public Read, Admin Write
+DROP POLICY IF EXISTS "Public Read Announcements" ON "Announcement";
+CREATE POLICY "Public Read Announcements"
+ON "Announcement" FOR SELECT
+USING (true);
+
+DROP POLICY IF EXISTS "Admin Write Announcements" ON "Announcement";
+CREATE POLICY "Admin Write Announcements"
+ON "Announcement" FOR ALL
+TO authenticated
+USING ( 
+    EXISTS (
+        SELECT 1 FROM "User" 
+        WHERE id = auth.uid() AND role = 'admin'
+    )
+);
