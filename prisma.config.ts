@@ -1,11 +1,15 @@
-import "dotenv/config";
-import { defineConfig } from "prisma/config";
+import { defineConfig } from '@prisma/config';
+import { loadEnvConfig } from '@next/env';
 
-export default defineConfig({
-  schema: "prisma/schema.prisma",
-  datasource: {
-    url: process.env.DATABASE_URL,
-    // @ts-ignore
-    directUrl: process.env.DIRECT_URL,
+const projectDir = process.cwd();
+loadEnvConfig(projectDir);
+
+// Cast to `any` to allow non-standard keys (studio) without type errors in tsc
+export default defineConfig(({
+  studio: {
+    port: 5555,
   },
-});
+  datasource: {
+    url: process.env.DATABASE_URL, // port 6543 (transaction pooler) — port 5432 is network-blocked
+  },
+} as any));

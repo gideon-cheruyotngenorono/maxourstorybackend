@@ -8,7 +8,19 @@ declare global {
   var prismaGlobal: PrismaClient | undefined
 }
 
-const connectionString = process.env.DATABASE_URL
+// Normalize DATABASE_URL: some deployment UIs (or copy/paste) include surrounding
+// quotes which become part of the value and cause authentication to fail.
+// Strip matching leading/trailing single or double quotes if present.
+const rawConnectionString = process.env.DATABASE_URL
+const connectionString = rawConnectionString ? rawConnectionString.replace(/^(["'])(.*)\1$/, '$2') : undefined
+
+if (rawConnectionString && rawConnectionString !== connectionString) {
+  // Avoid printing secrets; log only a short non-sensitive note for debugging.
+  // This will show up in server logs and helps identify misconfigured env values.
+  // Example: DATABASE_URL was set with surrounding quotes and has been sanitized.
+  // eslint-disable-next-line no-console
+  console.warn('[prisma] DATABASE_URL had surrounding quotes — value was sanitized')
+}
 let prisma: PrismaClient
 
 // Construct a pg Pool and adapter for Prisma v7 which expects an adapter or accelerateUrl
