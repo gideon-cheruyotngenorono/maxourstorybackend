@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
-import { firebaseAdmin } from '@/lib/firebase';
+import { OAuth2Client } from 'google-auth-library';
 import prisma from '@/lib/prisma';
 import { signAccessToken, signRefreshToken } from '@/lib/jwt';
 import { cookies } from 'next/headers';
+
+const client = new OAuth2Client(process.env.GOOGLE_WEB_CLIENT_ID);
 
 export async function POST(req: Request) {
   try {
@@ -13,18 +15,22 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'idToken is required' }, { status: 400 });
     }
 
-    // Verify token with Firebase Admin
-    const decodedToken = await firebaseAdmin.auth().verifyIdToken(idToken);
+    // Verify token with Google Auth Library (since Credential Manager issues Google ID tokens, not Firebase tokens)
+    const ticket = await client.verifyIdToken({
+      idToken,
+      audience: process.env.GOOGLE_WEB_CLIENT_ID,
+    });
+    
+    const payload = ticket.getPayload();
 
-    if (!decodedToken || !decodedToken.email) {
-      return NextResponse.json({ error: 'Invalid Firebase Google Token' }, { status: 401 });
+    if (!payload || !payload.email) {
+      return NextResponse.json({ error: 'Invalid Google Token' }, { status: 401 });
     }
 
-    // Google provides `user_id` inside the decoded token alongside standard payload mappings
-    const email = decodedToken.email;
-    const googleId = decodedToken.uid; 
-    const name = decodedToken.name || 'User';
-    const picture = decodedToken.picture || null;
+    const email = payload.email;
+    const googleId = payload.sub; // 'sub' is the unique Google user ID
+    const name = payload.name || 'User';
+    const picture = payload.picture || null;
 
     // Check if user exists (by Google ID or Email)
     let user = await prisma.user.findUnique({ where: { email } });
