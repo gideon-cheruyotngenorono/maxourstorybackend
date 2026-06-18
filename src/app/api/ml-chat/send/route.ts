@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { supabase } from '@/lib/supabase';
+import { dispatchNotification } from '@/services/notification';
 
 export async function POST(req: Request) {
   try {
@@ -44,14 +45,34 @@ export async function POST(req: Request) {
       }
     });
 
-    // Fire realtime event via Supabase (if client is listening to this channel)
-    // NOTE: Replace 'room_X' with your desired chat format
+    // Fire realtime event via Supabase
     const channelName = `chat_${couple.id}`;
     supabase.channel(channelName).send({
       type: 'broadcast',
       event: 'new_message',
       payload: { message }
     });
+
+    // Determine recipient (the other partner) and send FCM push
+    const recipientId = couple.partnerAId === userId ? couple.partnerBId : couple.partnerAId;
+    if (recipientId) {
+      const senderName = message.sender?.displayName || 'Your partner';
+      const preview = type === 'TEXT'
+        ? (content?.slice(0, 60) || '')
+        : `Sent a ${type.toLowerCase()}`;
+
+      dispatchNotification({
+        userId: recipientId,
+        type: 'NEW_MESSAGE',
+        title: `💬 ${senderName}`,
+        body: preview,
+        data: {
+          coupleId: couple.id,
+          messageId: message.id,
+          screen: 'Chat',
+        },
+      }); // fire-and-forget — don't await so send response stays fast
+    }
 
     return NextResponse.json({ success: true, message }, { status: 200 });
 

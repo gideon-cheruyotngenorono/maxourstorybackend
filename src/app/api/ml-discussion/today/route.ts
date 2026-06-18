@@ -7,7 +7,7 @@ export async function GET(req: Request) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    let topic = await prisma.discussionTopic.findUnique({
+    let topic = await prisma.dailyTopic.findUnique({
       where: { date: today }
     });
 
@@ -20,16 +20,19 @@ export async function GET(req: Request) {
       
       const question = await generateContent(prompt);
       
-      topic = await prisma.discussionTopic.create({
+      topic = await prisma.dailyTopic.create({
         data: {
-          question: question || "What is a memory from our relationship that always makes you smile?",
-          type: selectedType,
+          content: `${selectedType}|${question || "What is a memory from our relationship that always makes you smile?"}`,
           date: today,
         }
       });
     }
 
-    return NextResponse.json({ topic }, { status: 200 });
+    const parts = topic.content.split('|');
+    const type = parts.length > 1 ? parts[0] : "Discussion";
+    const question = parts.length > 1 ? parts[1] : topic.content;
+
+    return NextResponse.json({ topic: { question, type, date: topic.date } }, { status: 200 });
   } catch (error: any) {
     console.error('[DISCUSSION_TODAY]', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

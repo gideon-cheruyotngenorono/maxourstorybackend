@@ -6,9 +6,48 @@ const secret = new TextEncoder().encode(
   process.env.JWT_SECRET || 'changeme-jwt-secret-in-production'
 );
 
+// Simple memory rate limiter (per Edge instance)
+const rateLimitMap = new Map<string, number[]>();
+const WINDOW_MS = 60 * 1000; // 1 minute
+const MAX_REQUESTS = {
+  '/api/auth/login': 5,
+  '/api/auth/register': 5,
+  '/api/auth/forgot-password': 3,
+  '/api/ml-chat/send': 30, // 30 messages per minute
+};
+
+function checkRateLimit(ip: string, path: string): boolean {
+  for (const [route, limit] of Object.entries(MAX_REQUESTS)) {
+    if (path.startsWith(route)) {
+      const key = `${ip}:${route}`;
+      const now = Date.now();
+      const timestamps = rateLimitMap.get(key) || [];
+      const windowStart = now - WINDOW_MS;
+
+      const currentWindow = timestamps.filter(t => t > windowStart);
+      currentWindow.push(now);
+
+      rateLimitMap.set(key, currentWindow);
+
+      if (currentWindow.length > limit) {
+        return false; // Rate limited
+      }
+      return true;
+    }
+  }
+  return true; // No rate limit for this route
+}
+
 export async function middleware(req: NextRequest) {
+  const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'anon';
+  const path = req.nextUrl.pathname;
+
+  if (!checkRateLimit(ip, path)) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+  }
+
   // Routes to protect. Everything starting with /api/ml-
-  if (req.nextUrl.pathname.startsWith('/api/ml-')) {
+  if (path.startsWith('/api/ml-')) {
     const authHeader = req.headers.get('authorization');
     const token = authHeader?.split(' ')[1];
 

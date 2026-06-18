@@ -8,36 +8,38 @@ export async function GET(req: Request) {
     today.setHours(0, 0, 0, 0);
 
     // Try to find if a verse was already generated for today
-    let verse = await prisma.verse.findUnique({
+    let cachedVerse = await prisma.dailyVerse.findUnique({
       where: { date: today }
     });
 
-    if (!verse) {
+    if (!cachedVerse) {
       // Generate a new verse using Gemini
-      const prompt = `Provide an uplifting and romantic or family-oriented Bible verse from the WEB (World English Bible) translation suitable for a couple (Max and Leona). Format the response strictly as: Reference|Verse Text`;
+      const prompt = `Provide an uplifting and romantic or family-oriented Bible verse from the WEB (World English Bible) translation suitable for a couple. Format the response exactly as: Reference|Verse Text`;
       
       const responseText = await generateContent(prompt);
       const parts = responseText.split('|');
       
-      let reference = "1 Corinthians 13:4-5";
-      let text = "Love is patient and is kind; love doesn't envy. Love doesn't brag, is not proud, doesn't behave itself inappropriately, doesn't seek its own way, is not provoked, takes no account of evil;";
+      let content = "1 Corinthians 13:4-5|Love is patient and is kind; love doesn't envy. Love doesn't brag, is not proud, doesn't behave itself inappropriately, doesn't seek its own way, is not provoked,takes no account of evil;";
       
       if (parts.length >= 2) {
-        reference = parts[0].trim();
-        text = parts[1].trim();
+        content = `${parts[0].trim()}|${parts[1].trim()}`;
+      } else if (responseText) {
+        content = `Daily Verse|${responseText}`;
       }
 
-      verse = await prisma.verse.create({
+      cachedVerse = await prisma.dailyVerse.create({
         data: {
-          reference,
-          text,
-          version: 'WEB',
+          content,
           date: today,
         }
       });
     }
 
-    return NextResponse.json({ verse }, { status: 200 });
+    // Split content to match response shape expected by front-end if needed
+    // Assuming content is stored as "Reference|Text"
+    const [reference, text] = cachedVerse.content.split('|');
+
+    return NextResponse.json({ verse: { reference: reference || '', text: text || cachedVerse.content, version: 'WEB' } }, { status: 200 });
   } catch (error: any) {
     console.error('[VERSE_TODAY]', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

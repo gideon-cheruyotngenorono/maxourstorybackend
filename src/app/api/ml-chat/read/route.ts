@@ -38,8 +38,14 @@ export async function POST(req: Request) {
       )
     );
 
-    // Removed legacy isRead boolean update for backward compatibility 
-    // because the new schema handles it via messageReadReceipts
+    // Update legacy isRead boolean or simply set status='READ' and readAt
+    await prisma.message.updateMany({
+      where: { id: { in: messageIds } },
+      data: {
+        status: 'READ',
+        readAt: new Date()
+      }
+    });
 
     const channelName = `chat_${coupleId}`;
     supabase.channel(channelName).send({

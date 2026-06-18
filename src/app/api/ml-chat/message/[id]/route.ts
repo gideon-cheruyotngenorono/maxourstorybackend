@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { supabase } from '@/lib/supabase';
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -71,6 +72,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       data: { content, isEdited: true }
     });
 
+    const channelName = `chat_${message.coupleId}`;
+    supabase.channel(channelName).send({
+      type: 'broadcast',
+      event: 'message_updated',
+      payload: { message: updatedMessage }
+    });
+
     return NextResponse.json({ data: updatedMessage }, { status: 200 });
 
   } catch (error: any) {
@@ -101,7 +109,14 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     // Soft delete logic since we use isDeleted boolean
     const updatedMessage = await prisma.message.update({
       where: { id },
-      data: { isDeleted: true, content: 'This message was deleted' }
+      data: { isDeleted: true, content: 'This message was deleted', deletedAt: new Date() }
+    });
+
+    const channelName = `chat_${message.coupleId}`;
+    supabase.channel(channelName).send({
+      type: 'broadcast',
+      event: 'message_deleted',
+      payload: { messageId: id, coupleId: message.coupleId, deletedAt: new Date() }
     });
 
     return NextResponse.json({ data: updatedMessage }, { status: 200 });

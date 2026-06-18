@@ -43,6 +43,19 @@ export async function POST(req: Request) {
       path: '/',
     });
 
+    const crypto = require('crypto');
+    const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+
+    await prisma.refreshToken.create({
+      data: {
+        userId: user.id,
+        tokenHash,
+        expiresAt,
+      }
+    });
+
     return NextResponse.json(
       {
         message: 'Login successful',
