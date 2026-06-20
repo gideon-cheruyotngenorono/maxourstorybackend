@@ -42,8 +42,26 @@ export async function middleware(req: NextRequest) {
   const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'anon';
   const path = req.nextUrl.pathname;
 
+  // ── CORS Headers ──────────────────────────────────────────────────────────
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers':
+      'Content-Type, Authorization, x-user-id, x-admin-key',
+    'Access-Control-Max-Age': '86400', // cache preflight for 24 h
+  };
+
+  // Handle preflight OPTIONS request immediately — no auth needed
+  if (req.method === 'OPTIONS') {
+    return new NextResponse(null, { status: 204, headers: corsHeaders });
+  }
+
+  // Rate limiting
   if (!checkRateLimit(ip, path)) {
-    return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: corsHeaders }
+    );
   }
 
   // Routes to protect. Everything starting with /api/ml-
@@ -52,29 +70,46 @@ export async function middleware(req: NextRequest) {
     const token = authHeader?.split(' ')[1];
 
     if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401, headers: corsHeaders }
+      );
     }
 
     try {
       const { payload } = await jwtVerify(token, secret);
-      
+
       // Pass the userId to the route header
       const requestHeaders = new Headers(req.headers);
       requestHeaders.set('x-user-id', payload.userId as string);
 
-      return NextResponse.next({
-        request: {
-          headers: requestHeaders,
-        },
+      const response = NextResponse.next({
+        request: { headers: requestHeaders },
       });
+
+      // Attach CORS headers to the forwarded request response
+      Object.entries(corsHeaders).forEach(([key, value]) => {
+        response.headers.set(key, value);
+      });
+
+      return response;
     } catch (error) {
-      return NextResponse.json({ error: 'Invalid Token' }, { status: 401 });
+      return NextResponse.json(
+        { error: 'Invalid Token' },
+        { status: 401, headers: corsHeaders }
+      );
     }
   }
 
-  return NextResponse.next();
+  // For all other routes, attach CORS headers and pass through
+  const response = NextResponse.next();
+  Object.entries(corsHeaders).forEach(([key, value]) => {
+    response.headers.set(key, value);
+  });
+  return response;
 }
 
 export const config = {
-  matcher: ['/api/ml-:path*'],
+  // Match all /api/* routes so CORS + preflight is handled everywhere
+  matcher: ['/api/:path*'],
 };

@@ -1,178 +1,181 @@
-# Our Story API Documentation
+# Our Story API Integration Guide
 
-## Authentication
-All endpoints (except login/registration if applicable) require a Bearer token in the `Authorization` header.
-`Authorization: Bearer <your_jwt_token>`
+Base URL: `https://maxourstorybackend.vercel.app`
 
----
+## Universal Authentication Rules
+Almost all protected routes (except Auth and Webhooks) require the caller to provide identity headers.
 
-## User Profile Management
-### 1. GET /api/user/profile
-Fetch current user's profile.
-**Returns**: `200 OK` with `{ displayName, email, avatarUrl, createdAt }`.
-
-### 2. PATCH /api/user/profile
-Update profile details.
-**Body**: `{ displayName?, avatarUrl? }`
-**Returns**: `200 OK` with updated profile.
-
-### 3. DELETE /api/user/account
-Delete user account.
-**Body**: `{ password }` (Confirmation)
-**Returns**: `200 OK` on success.
+**Required Headers for Protected Routes:**
+- `x-user-id`: The User ID obtained during Login/Register.
+- `Authorization`: Bearer token (Access Token).
+- `Content-Type`: `application/json` (Crucial for `POST`, `PUT`, `PATCH` requests; omitting this will often cause a **400 Bad Request** error).
 
 ---
 
-## Couple Management
-### 4. PATCH /api/ml-couple/profile
-Update anniversary or relationship start date.
-**Body**: `{ anniversaryDate }`
-**Returns**: `200 OK`.
+## 1. Authentication Endpoints
 
-### 5. DELETE /api/ml-couple
-Dissolve couple relationship.
-**Returns**: `200 OK`.
+> [!WARNING]
+> Ensure you send `Content-Type: application/json` for all these requests. The register route explicitly throws a 400 Bad Request if this header is missing or if the body is empty/malformed.
 
-### 6. POST /api/ml-couple/invite/resend
-Resend invite code to partner.
-**Returns**: `200 OK`.
+### Register
+**`POST /api/auth/register`**
+Creates a new user account.
+- **Body:** `{ "email": "user@example.com", "password": "password123", "displayName": "John Doe" }`
+- **Success (201):** `{ "message": "...", "user": { "id": "...", ... }, "accessToken": "..." }`
+- Note: Refresh token is set as an HTTP-only cookie automatically.
 
----
+### Login
+**`POST /api/auth/login`**
+Authenticates an existing user.
+- **Body:** `{ "email": "user@example.com", "password": "password123" }`
+- **Success (200):** `{ "message": "...", "user": { "id": "...", ... }, "accessToken": "..." }`
 
-## Chat System
-### 7. DELETE /api/ml-chat/message/:id
-Soft delete a message.
-**Returns**: `200 OK` with updated message.
+### Google Auth
+**`POST /api/auth/google`**
+Authenticates or registers a user via Google ID Token.
+- **Body:** `{ "idToken": "google_id_token_here" }`
+- **Success (200):** `{ "message": "...", "user": { ... }, "accessToken": "..." }`
 
-### 8. PATCH /api/ml-chat/message/:id
-Edit a message (within 5 minutes).
-**Body**: `{ content }`
-**Returns**: `200 OK`.
-
-### 9. GET /api/ml-chat/message/:id
-Fetch single message with reply chain and reactions.
-**Returns**: `200 OK`.
-
----
-
-## The Jar
-### 10. DELETE /api/ml-jar/:id
-Remove a jar entry.
-**Returns**: `204 No Content`.
-
-### 11. GET /api/ml-jar/all
-Fetch all jar entries (paginated).
-**Query Params**: `cursor`, `limit`
-**Returns**: `200 OK` with `{ data: [...], nextCursor }`.
+### Refresh Token
+**`POST /api/auth/refresh`**
+Gets a new access token using the HTTP-only cookie.
+- **Body:** None
+- **Success (200):** `{ "accessToken": "new_token" }`
 
 ---
 
-## Shared Notes
-### 12. GET /api/ml-notes/:id
-Fetch single note.
-**Returns**: `200 OK`.
+## 2. User & Profile Endpoints
 
-### 13. PATCH /api/ml-notes/:id
-Edit note title or content.
-**Body**: `{ title?, content? }`
-**Returns**: `200 OK`.
+### Get Profile
+**`GET /api/user/profile`**
+- **Headers:** `x-user-id`
+- **Success (200):** Returns user profile with `displayName` and `avatarUrl`.
 
-### 14. DELETE /api/ml-notes/:id
-Soft delete note.
-**Returns**: `200 OK`.
+### Update Profile
+**`PATCH /api/user/profile`**
+- **Headers:** `x-user-id`
+- **Body (Optional fields):** `{ "displayName": "New Name", "avatarUrl": "https://..." }`
+- **Success (200):** Returns updated user profile.
 
----
-
-## Prayer Room
-### 15. GET /api/ml-prayer/:id
-Fetch single prayer.
-**Returns**: `200 OK`.
-
-### 16. PATCH /api/ml-prayer/:id
-Edit prayer or category.
-**Body**: `{ content?, category? }`
-**Returns**: `200 OK`.
-
-### 17. DELETE /api/ml-prayer/:id
-Soft delete prayer.
-**Returns**: `200 OK`.
+### Delete Account
+**`DELETE /api/user/account`**
+- **Headers:** `x-user-id`, `Authorization: Bearer <token>`
+- **Success (200):** `{ "success": true }`
 
 ---
 
-## AI Features & History
-### 18. GET /api/ml-discussion/history
-Past daily questions (paginated).
-**Returns**: `200 OK`.
+## 3. Couple & Connection Endpoints
 
-### 19. GET /api/ml-verse/history
-Past daily verses (paginated).
-**Returns**: `200 OK`.
+> [!IMPORTANT]
+> A user can only be in one couple at a time. Trying to create or join a couple when already in one will result in a 400 Bad Request.
 
-### 20. POST /api/ml-verse/favorite/:verseId
-Save a verse as favorite.
-**Returns**: `200 OK`.
+### Create/Invite
+**`POST /api/ml-couple/create`**
+Generates an invite code to form a couple.
+- **Headers:** `x-user-id`
+- **Body (Optional):** `{ "partnerEmail": "partner@example.com" }`
+- **Success (201):** `{ "message": "...", "inviteCode": "A1B2C3", "couple": { ... } }`
+
+### Join via Invite Code
+**`POST /api/ml-couple/join`**
+Links you to a partner using an invite code.
+- **Headers:** `x-user-id`
+- **Body:** `{ "inviteCode": "A1B2C3" }` *(Must be the exact string)*
+- **Success (200):** `{ "message": "...", "couple": { ... } }`
+
+### Get Couple Profile
+**`GET /api/ml-couple/profile`**
+- **Headers:** `x-user-id`
+- **Success (200):** `{ "partnerA": { ... }, "partnerB": { ... }, "daysTogether": 15 }`
+
+### Update Anniversary Date
+**`PATCH /api/ml-couple/profile`**
+- **Headers:** `x-user-id`
+- **Body:** `{ "anniversaryDate": "2023-01-01T00:00:00.000Z" }`
+- **Success (200):** `{ "success": true, "anniversaryDate": "..." }`
+
+### Delete Couple
+**`DELETE /api/ml-couple`**
+Dissolves the couple and cascades deletions to shared data (messages, notes, etc).
+- **Headers:** `x-user-id`
+- **Success (200):** `{ "success": true, "message": "..." }`
 
 ---
 
-## Notifications
-### 21. GET /api/ml-notify/preferences
-Get notification settings.
-**Returns**: `200 OK`.
+## 4. Chat Endpoints
 
-### 22. PATCH /api/ml-notify/preferences
-Update notification settings.
-**Body**: `{ pushEnabled?, dailyReminder?, chatNotifications?, partnerActivity? }`
-**Returns**: `200 OK`.
+### Send Message
+**`POST /api/ml-chat/send`**
+- **Headers:** `x-user-id`
+- **Body for Text:** `{ "type": "TEXT", "content": "Hello!" }`
+- **Body for Media:** `{ "type": "IMAGE", "mediaUrl": "https://...", "fileName": "pic.jpg" }`
+- **Valid Types:** `TEXT`, `IMAGE`, `VIDEO`, `AUDIO`, `FILE`, `SYSTEM`
+- **Success (200):** `{ "success": true, "message": { ... } }`
 
----
-
-## Auth
-### 23. POST /api/auth/logout
-Invalidate session and clear cookies.
-**Returns**: `200 OK`.
+### Get Chat History
+**`GET /api/ml-chat/history?limit=50&cursor=msg_id`**
+- **Headers:** `x-user-id`
+- **Success (200):** `{ "messages": [ ... ] }`
 
 ---
 
-## Admin Panel (Role: admin required)
-### 24. GET /api/admin/users
-List all users (paginated).
-**Query Params**: `search`, `cursor`, `limit`
+## 5. Notes Endpoints
 
-### 25. GET /api/admin/users/:id
-Fetch full user details.
+### Create Note
+**`POST /api/ml-notes/create`**
+- **Headers:** `x-user-id`
+- **Body:** `{ "title": "Grocery List", "content": "Apples, Bananas", "mediaUrl": null, "isPinned": false, "color": "#FFFFFF" }`
+- **Success (201):** `{ "note": { ... } }`
 
-### 26. PATCH /api/admin/users/:id
-Update user role or active status.
-**Body**: `{ role?, isActive? }`
+### List Notes
+**`GET /api/ml-notes/list`**
+- **Headers:** `x-user-id`
+- **Success (200):** `{ "notes": [ ... ] }`
 
-### 27. DELETE /api/admin/users/:id
-Permanently delete user. Requires admin password.
+### Update Note
+**`PUT /api/ml-notes/update`**
+- **Headers:** `x-user-id`
+- **Body:** `{ "id": "note_id", "title": "Updated Title", "content": "Updated Content" }`
+- **Success (200):** `{ "note": { ... } }`
 
-### 28. GET /api/admin/couples
-List all couples.
+### Delete Note
+**`DELETE /api/ml-notes/delete?id=note_id`**
+- **Headers:** `x-user-id`
+- **Success (200):** `{ "success": true }`
 
-### 29. GET /api/admin/couples/:id
-Fetch couple details and stats.
+---
 
-### 30. DELETE /api/admin/couples/:id
-Force dissolve a couple.
+## 6. Gratitude Endpoints
 
-### 31. GET /api/admin/reports
-List moderation reports.
+### Create Gratitude Entry
+**`POST /api/ml-gratitude/create`**
+- **Headers:** `x-user-id`
+- **Body:** `{ "content": "Thankful for you", "date": "2026-06-19T00:00:00.000Z", "isShared": true }`
+- **Success (201):** `{ "entry": { ... } }`
 
-### 32. POST /api/admin/reports/:id/resolve
-Resolve a report with an action.
-**Body**: `{ action: "warn"|"delete_content"|"ban_user"|"dismiss", adminNotes }`
+### List Gratitude Entries
+**`GET /api/ml-gratitude/list`**
+- **Headers:** `x-user-id`
+- **Success (200):** `{ "entries": [ ... ] }`
 
-### 33. DELETE /api/admin/content/:type/:id
-Delete specific content (message, note, jar_entry, prayer).
+### Update & Delete Gratitude
+- **PUT `/api/ml-gratitude/update`**: Body requires `{ "id": "...", "content": "...", "date": "...", "isShared": true }`
+- **DELETE `/api/ml-gratitude/delete?id=entry_id`**: Passed via query parameters.
 
-### 34. GET /api/admin/stats
-Platform-wide analytics and activity charts.
+---
 
-### 35. POST /api/admin/announcement
-Create platform announcement.
-**Body**: `{ title, message, priority, expiresAt }`
+## 🛑 Common Causes for "400 Bad Request" 
 
-### 36. GET /api/admin/announcements
-List announcements.
+1. **Missing `Content-Type: application/json` Header**  
+   If your frontend agent is omitting this header, Next.js won't parse the body correctly, and Zod validator will throw an error.
+   
+2. **Invalid Data Formats (Zod Validation)**  
+   Ensure dates are in standard ISO strings (`YYYY-MM-DDTHH:mm:ss.sssZ`), and boolean values (`isShared`, `isPinned`) are actual booleans (`true`/`false`), not strings (`"true"`).
+   
+3. **Empty Request Bodies**  
+   Sending `null` or `{}` for endpoints that expect data (like Registration, Login, Create forms) will throw a validation error.
+
+4. **Couple Logic Violations**  
+   - Trying to join a couple when you are already in one throws `400`.
+   - Trying to join with an invalid/expired invite code throws `404` or `400`.
+   - You cannot use your own invite code.
