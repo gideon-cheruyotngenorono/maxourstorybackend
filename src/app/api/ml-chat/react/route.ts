@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { supabase } from '@/lib/supabase';
+import { broadcastToChannel } from '@/lib/supabase';
 
 const ALLOWED_EMOJIS = ['❤️', '🥰', '😂', '😭', '🙏', '👍'];
 
@@ -50,12 +50,7 @@ export async function POST(req: Request) {
       });
     }
 
-    const channelName = `chat_${message.coupleId}`;
-    supabase.channel(channelName).send({
-      type: 'broadcast',
-      event: 'reaction_update',
-      payload: { messageId, userId, emoji, action: actionType, reaction }
-    });
+    broadcastToChannel(`chat_${message.coupleId}`, 'reaction_update', { messageId, userId, emoji, action: actionType, reaction });
 
     return NextResponse.json({ success: true, action: actionType }, { status: 200 });
 

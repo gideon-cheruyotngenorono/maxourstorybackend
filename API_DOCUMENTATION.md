@@ -48,19 +48,82 @@ Gets a new access token using the HTTP-only cookie.
 
 ### Get Profile
 **`GET /api/user/profile`**
-- **Headers:** `x-user-id`
-- **Success (200):** Returns user profile with `displayName` and `avatarUrl`.
+- **Headers:** `x-user-id`, `Authorization: Bearer <token>`
+- **Success (200):** Returns user profile with `displayName`, `avatarUrl`, and `avatarInitials`.
 
-### Update Profile
+### Update Profile (text fields only)
 **`PATCH /api/user/profile`**
-- **Headers:** `x-user-id`
+- **Headers:** `x-user-id`, `Authorization: Bearer <token>`, `Content-Type: application/json`
 - **Body (Optional fields):** `{ "displayName": "New Name", "avatarUrl": "https://..." }`
 - **Success (200):** Returns updated user profile.
+
+### Upload Avatar (file from gallery)
+**`POST /api/user/avatar`**
+
+> [!IMPORTANT]
+> This is a **multipart/form-data** request — do NOT set `Content-Type: application/json`. Let the HTTP client set it automatically with the boundary.
+
+- **Headers:** `Authorization: Bearer <token>` *(x-user-id is injected by middleware from the token)*
+- **Body:** `multipart/form-data` with field name **`avatar`**
+- **Allowed types:** `image/jpeg`, `image/png`, `image/webp`
+- **Max size:** 5 MB
+- **Success (200):**
+  ```json
+  { "success": true, "avatarUrl": "https://...", "message": "Avatar uploaded successfully" }
+  ```
+- **415** — Wrong file type (not jpg/png/webp)
+- **413** — File exceeds 5 MB
+
+**Android Retrofit example:**
+```kotlin
+@Multipart
+@POST("api/user/avatar")
+suspend fun uploadAvatar(
+    @Header("Authorization") token: String,
+    @Part avatar: MultipartBody.Part
+): Response<AvatarUploadResponse>
+
+// Build the part:
+val file = File(imagePath)
+val requestFile = file.asRequestBody("image/jpeg".toMediaType())
+val avatarPart = MultipartBody.Part.createFormData("avatar", file.name, requestFile)
+```
+
+### Delete Avatar
+**`DELETE /api/user/avatar`**
+- **Headers:** `Authorization: Bearer <token>`
+- **Success (200):** `{ "success": true, "message": "Avatar deleted successfully" }`
 
 ### Delete Account
 **`DELETE /api/user/account`**
 - **Headers:** `x-user-id`, `Authorization: Bearer <token>`
 - **Success (200):** `{ "success": true }`
+
+---
+
+## 3. Media Upload (Chat & Notes)
+
+### Step 1 – Upload File
+**`POST /api/ml-storage/upload`**
+
+> [!IMPORTANT]
+> Also **multipart/form-data** — do NOT set `Content-Type: application/json`.
+
+- **Headers:** `Authorization: Bearer <token>`
+- **Body fields:**
+  - `file` — the file blob
+  - `type` — one of `IMAGE`, `VIDEO`, `AUDIO`, `FILE`
+- **Size limits:** IMAGE 10 MB · VIDEO 50 MB · AUDIO 20 MB · FILE 25 MB
+- **Success (200):**
+  ```json
+  { "success": true, "url": "https://...", "size": 12345, "originalName": "pic.jpg" }
+  ```
+
+### Step 2 – Send Message with the URL
+**`POST /api/ml-chat/send`** *(Content-Type: application/json)*
+```json
+{ "type": "IMAGE", "mediaUrl": "https://...", "fileName": "pic.jpg" }
+```
 
 ---
 

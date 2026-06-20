@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { supabase } from '@/lib/supabase';
+import { broadcastToChannel } from '@/lib/supabase';
 
 export async function POST(req: Request) {
   try {
@@ -47,12 +47,7 @@ export async function POST(req: Request) {
       }
     });
 
-    const channelName = `chat_${coupleId}`;
-    supabase.channel(channelName).send({
-      type: 'broadcast',
-      event: 'read_receipt',
-      payload: { userId, messageIds: messages.map(m => m.id), readAt: new Date() }
-    });
+    broadcastToChannel(`chat_${coupleId}`, 'read_receipt', { userId, messageIds: messages.map(m => m.id), readAt: new Date() });
 
     return NextResponse.json({ success: true, updatedCount: receipts.length }, { status: 200 });
 

@@ -64,8 +64,12 @@ export async function middleware(req: NextRequest) {
     );
   }
 
-  // Routes to protect. Everything starting with /api/ml-
-  if (path.startsWith('/api/ml-')) {
+  // ── Protected routes: /api/ml-* and /api/user/* ──────────────────────────
+  // Both require a valid Bearer JWT; userId is injected as x-user-id header.
+  const isProtected =
+    path.startsWith('/api/ml-') || path.startsWith('/api/user/');
+
+  if (isProtected) {
     const authHeader = req.headers.get('authorization');
     const token = authHeader?.split(' ')[1];
 

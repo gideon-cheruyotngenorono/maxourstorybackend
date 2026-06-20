@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { supabase } from '@/lib/supabase';
+import { broadcastToChannel } from '@/lib/supabase';
 import { dispatchNotification } from '@/services/notification';
 
 export async function POST(req: Request) {
@@ -45,13 +45,8 @@ export async function POST(req: Request) {
       }
     });
 
-    // Fire realtime event via Supabase
-    const channelName = `chat_${couple.id}`;
-    supabase.channel(channelName).send({
-      type: 'broadcast',
-      event: 'new_message',
-      payload: { message }
-    });
+    // Fire realtime event via Supabase REST broadcast (no WebSocket needed on server)
+    broadcastToChannel(`chat_${couple.id}`, 'new_message', { message });
 
     // Determine recipient (the other partner) and send FCM push
     const recipientId = couple.partnerAId === userId ? couple.partnerBId : couple.partnerAId;
