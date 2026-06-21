@@ -1,44 +1,72 @@
-import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
-import { requireAdmin } from '@/lib/adminAuth';
+import { NextRequest, NextResponse } from 'next/server'
+import prisma from '@/lib/prisma'
+import { isAdmin, promoteToAdmin, demoteFromAdmin } from '@/lib/admin'
 
-export async function GET(req: Request) {
+// GET: List all users (admin only)
+export async function GET(request: NextRequest) {
   try {
-    const auth = await requireAdmin(req);
-    if (auth.error) return auth.error;
-
-    const { searchParams } = new URL(req.url);
-    const cursor = searchParams.get('cursor');
-    const limit = parseInt(searchParams.get('limit') || '50', 10);
-    const search = searchParams.get('search') || undefined;
-
-    const users = await prisma.user.findMany({
-      take: limit + 1,
-      cursor: cursor ? { id: cursor } : undefined,
-      where: search ? {
-        email: { contains: search, mode: 'insensitive' }
-      } : undefined,
-      orderBy: { createdAt: 'desc' },
-      select: {
-        id: true,
-        displayName: true,
-        email: true,
-        role: true,
-        createdAt: true,
-        isActive: true,
-      }
-    });
-
-    let nextCursor: typeof cursor | null = null;
-    if (users.length > limit) {
-      const nextItem = users.pop();
-      nextCursor = nextItem!.id;
+    const userId = request.headers.get('x-user-id')
+    if (!userId || !await isAdmin(userId)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    return NextResponse.json({ data: users, nextCursor }, { status: 200 });
+    const users = await prisma.user.findMany({
+      select: {
+        id: true,
+        email: true,
+        displayName: true,
+        avatarUrl: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    })
 
+    return NextResponse.json(users)
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Failed to fetch users' },
+      { status: 500 }
+    )
+  }
+}
+
+// POST: Promote or demote user
+export async function POST(request: NextRequest) {
+  try {
+    const userId = request.headers.get('x-user-id')
+    if (!userId || !await isAdmin(userId)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const body = await request.json()
+    const { action, email } = body
+
+    if (!action || !email) {
+      return NextResponse.json(
+        { error: 'action and email are required' },
+        { status: 400 }
+      )
+    }
+
+    let result
+    if (action === 'promote') {
+      result = await promoteToAdmin(userId, email)
+    } else if (action === 'demote') {
+      result = await demoteFromAdmin(userId, email)
+    } else {
+      return NextResponse.json(
+        { error: 'Invalid action. Use "promote" or "demote"' },
+        { status: 400 }
+      )
+    }
+
+    return NextResponse.json(result)
   } catch (error: any) {
-    console.error('[ADMIN_USERS_GET]', error);
-    return NextResponse.json({ error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || 'Failed to update user' },
+      { status: 500 }
+    )
   }
 }

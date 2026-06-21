@@ -67,7 +67,11 @@ export async function middleware(req: NextRequest) {
   // ── Protected routes: /api/ml-* and /api/user/* ──────────────────────────
   // Both require a valid Bearer JWT; userId is injected as x-user-id header.
   const isProtected =
-    path.startsWith('/api/ml-') || path.startsWith('/api/user/');
+    path.startsWith('/api/ml-') || 
+    path.startsWith('/api/user/') ||
+    path.startsWith('/api/messages') ||
+    path.startsWith('/api/admin') ||
+    path.startsWith('/api/upload');
 
   if (isProtected) {
     const authHeader = req.headers.get('authorization');
@@ -86,6 +90,18 @@ export async function middleware(req: NextRequest) {
       // Pass the userId to the route header
       const requestHeaders = new Headers(req.headers);
       requestHeaders.set('x-user-id', payload.userId as string);
+
+      if (path.startsWith('/api/admin')) {
+        const role = payload.role;
+        // Optionally, if the role isn't in JWT, the route handler will check it via DB.
+        // But if it is in JWT, we can block early.
+        if (role && role !== 'admin') {
+          return NextResponse.json(
+            { error: 'Admin access required' },
+            { status: 403, headers: corsHeaders }
+          );
+        }
+      }
 
       const response = NextResponse.next({
         request: { headers: requestHeaders },
