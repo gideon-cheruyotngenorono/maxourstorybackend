@@ -64,16 +64,7 @@ export async function GET(request: NextRequest) {
             avatarUrl: true,
           },
         },
-        reactions: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                displayName: true,
-              },
-            },
-          },
-        },
+        reactions: true,
         replies: {
           include: {
             sender: {

@@ -31,7 +31,7 @@ export async function uploadFile(
     .from(bucket)
     .getPublicUrl(path)
 
-  return { url: publicUrl, path, ...data }
+  return { url: publicUrl, ...data }
 }
 
 // Function to delete file

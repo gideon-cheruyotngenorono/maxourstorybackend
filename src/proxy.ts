@@ -38,7 +38,7 @@ function checkRateLimit(ip: string, path: string): boolean {
   return true; // No rate limit for this route
 }
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'anon';
   const path = req.nextUrl.pathname;
 
