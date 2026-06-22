@@ -15,6 +15,7 @@ model User {
   avatarUrl           String?
   avatarPath          String?
   fcmToken            String?
+  coupleId            String?              // Denormalized cache for fast couple lookup
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
   couplesAsPartnerA   Couple[]             @relation("PartnerA")

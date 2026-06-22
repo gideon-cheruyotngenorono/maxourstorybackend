@@ -39,6 +39,12 @@ export async function POST(req: Request) {
       }
     });
 
+    // Stamp coupleId on the creating user for fast lookups
+    await prisma.user.update({
+      where: { id: userId },
+      data: { coupleId: couple.id }
+    });
+
     if (partnerEmail) {
       const emailResult = await sendEmail({
         to: partnerEmail,
@@ -53,18 +59,18 @@ export async function POST(req: Request) {
 
       if (!emailResult.success) {
         console.error('[COUPLE_CREATE] Failed to send invite email:', emailResult.error);
-        return NextResponse.json({ 
+        return NextResponse.json({
           error: { code: 'EMAIL_FAILURE', message: 'Couple created but failed to send invite email. Please try resending from profile.' },
-          inviteCode, 
-          couple 
+          inviteCode,
+          couple
         }, { status: 500 });
       }
     }
 
-    return NextResponse.json({ 
-      message: 'Pending couple created successfully!', 
-      inviteCode, 
-      couple 
+    return NextResponse.json({
+      message: 'Pending couple created successfully!',
+      inviteCode,
+      couple
     }, { status: 201 });
 
   } catch (error: any) {

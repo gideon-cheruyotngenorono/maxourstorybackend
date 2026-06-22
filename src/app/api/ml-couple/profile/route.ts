@@ -2,30 +2,55 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { formatUserWithAvatar } from '@/services/avatar';
 
+/**
+ * Looks up a couple for a given userId.
+ * Strategy: 1. Use denormalized coupleId on User for speed
+ *           2. Fall back to OR query scanning Couple table (for legacy users)
+ */
+async function findCoupleForUser(userId: string) {
+  // Fast path: user already has coupleId stamped
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { coupleId: true }
+  });
+
+  if (user?.coupleId) {
+    const couple = await prisma.couple.findUnique({
+      where: { id: user.coupleId },
+      include: {
+        partnerA: { select: { id: true, displayName: true, avatarUrl: true } },
+        partnerB: { select: { id: true, displayName: true, avatarUrl: true } }
+      }
+    });
+    if (couple) return couple;
+  }
+
+  // Fallback: scan the Couple table (handles old accounts without coupleId)
+  const couple = await prisma.couple.findFirst({
+    where: { OR: [{ partnerAId: userId }, { partnerBId: userId }] },
+    include: {
+      partnerA: { select: { id: true, displayName: true, avatarUrl: true } },
+      partnerB: { select: { id: true, displayName: true, avatarUrl: true } }
+    }
+  });
+
+  // Backfill coupleId so next call is fast
+  if (couple) {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { coupleId: couple.id }
+    }).catch(() => {}); // non-fatal
+  }
+
+  return couple;
+}
+
 export async function GET(req: Request) {
   try {
     const userId = req.headers.get('x-user-id');
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const couple = await prisma.couple.findFirst({
-      where: { OR: [{ partnerAId: userId }, { partnerBId: userId }] },
-      include: {
-        partnerA: {
-          select: {
-            id: true,
-            displayName: true,
-            avatarUrl: true,
-          }
-        },
-        partnerB: {
-          select: {
-            id: true,
-            displayName: true,
-            avatarUrl: true,
-          }
-        }
-      }
-    });
+    const couple = await findCoupleForUser(userId);
 
     if (!couple) {
       return NextResponse.json({ error: 'Couple not found' }, { status: 404 });
@@ -37,9 +62,12 @@ export async function GET(req: Request) {
     const daysTogether = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
     return NextResponse.json({
+      coupleId: couple.id,
       partnerA: formatUserWithAvatar(couple.partnerA),
       partnerB: couple.partnerB ? formatUserWithAvatar(couple.partnerB) : null,
       daysTogether,
+      anniversaryDate: couple.anniversaryDate,
+      createdAt: couple.createdAt,
     }, { status: 200 });
 
   } catch (error: any) {
@@ -60,9 +88,7 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: { code: 'BAD_REQUEST', message: 'anniversaryDate is required' } }, { status: 400 });
     }
 
-    const couple = await prisma.couple.findFirst({
-      where: { OR: [{ partnerAId: userId }, { partnerBId: userId }] }
-    });
+    const couple = await findCoupleForUser(userId);
 
     if (!couple) {
       return NextResponse.json({ error: { code: 'NOT_FOUND', message: 'Couple not found' } }, { status: 404 });
@@ -73,9 +99,9 @@ export async function PATCH(req: Request) {
       data: { anniversaryDate: new Date(anniversaryDate) }
     });
 
-    return NextResponse.json({ 
-      success: true, 
-      anniversaryDate: updatedCouple.anniversaryDate 
+    return NextResponse.json({
+      success: true,
+      anniversaryDate: updatedCouple.anniversaryDate
     }, { status: 200 });
 
   } catch (error: any) {

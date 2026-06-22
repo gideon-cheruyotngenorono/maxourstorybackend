@@ -362,12 +362,12 @@ interface TimelineEvent {
 ### Couple Creation & Connection
 * **Create Invite (`POST /api/ml-couple/create`)**
   * **Request JSON:** `{ "partnerEmail": "string (optional)" }`
-  * **Response JSON:** `{ "message": "...", "inviteCode": "string", "couple": { ... } }`
+  * **Response JSON:** `{ "message": "...", "inviteCode": "string", "couple": { "id": "...", ... } }`
 * **Join Couple (`POST /api/ml-couple/join`)**
   * **Request JSON:** `{ "inviteCode": "string" }`
-  * **Response JSON:** `{ "message": "...", "couple": { ... } }`
+  * **Response JSON:** `{ "message": "...", "couple": { "id": "...", ... } }`
 * **Get Couple Profile (`GET /api/ml-couple/profile`)**
-  * **Response JSON:** `{ "partnerA": { ... }, "partnerB": { ... } | null, "daysTogether": number }`
+  * **Response JSON:** `{ "coupleId": "string", "partnerA": { ... }, "partnerB": { ... } | null, "daysTogether": number }`
 
 ### Notes (`/api/ml-notes/create`)
 * **Request JSON:**

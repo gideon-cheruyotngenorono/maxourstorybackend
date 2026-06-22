@@ -9,7 +9,7 @@ export async function POST(req: Request) {
 
     const body = await req.json();
 
-    // Check if either is already in a couple
+    // Check if this user is already in a couple
     const userAlreadyInCouple = await prisma.couple.findFirst({
       where: {
         OR: [
@@ -22,7 +22,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'You are already in a couple.' }, { status: 400 });
     }
 
-    // Handle Join via Invite Code
+    // ─── Path 1: Join via Invite Code ───────────────────────────────────────
     if (body.inviteCode) {
       const inviteCode = body.inviteCode.toString().toUpperCase();
       const pendingCouple = await prisma.couple.findUnique({
@@ -45,13 +45,36 @@ export async function POST(req: Request) {
         data: {
           partnerBId: userId,
           inviteCode: null // Consume the invite code
+        },
+        include: {
+          partnerA: {
+            select: { id: true, displayName: true, avatarUrl: true, email: true }
+          },
+          partnerB: {
+            select: { id: true, displayName: true, avatarUrl: true, email: true }
+          }
         }
       });
 
-      return NextResponse.json({ message: 'Successfully joined via invite code!', couple }, { status: 200 });
+      // Stamp coupleId on BOTH partners for fast lookups
+      await Promise.all([
+        prisma.user.update({
+          where: { id: userId },
+          data: { coupleId: couple.id }
+        }),
+        prisma.user.update({
+          where: { id: pendingCouple.partnerAId },
+          data: { coupleId: couple.id }
+        }),
+      ]);
+
+      return NextResponse.json({
+        message: 'Successfully joined via invite code!',
+        couple
+      }, { status: 200 });
     }
 
-    // Handle Join via Email (Legacy / Alternative)
+    // ─── Path 2: Join via Email (Legacy / Alternative) ──────────────────────
     const parsed = createCoupleSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
@@ -90,7 +113,21 @@ export async function POST(req: Request) {
         partnerBId: partnerB.id,
         anniversaryDate: anniversaryDate ? new Date(anniversaryDate) : null,
       },
+      include: {
+        partnerA: {
+          select: { id: true, displayName: true, avatarUrl: true, email: true }
+        },
+        partnerB: {
+          select: { id: true, displayName: true, avatarUrl: true, email: true }
+        }
+      }
     });
+
+    // Stamp coupleId on both partners
+    await Promise.all([
+      prisma.user.update({ where: { id: userId }, data: { coupleId: couple.id } }),
+      prisma.user.update({ where: { id: partnerB.id }, data: { coupleId: couple.id } }),
+    ]);
 
     return NextResponse.json({ message: 'Couple linked successfully!', couple }, { status: 201 });
   } catch (error: any) {
