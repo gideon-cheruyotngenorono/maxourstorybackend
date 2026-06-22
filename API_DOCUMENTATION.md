@@ -426,6 +426,29 @@ interface TimelineEvent {
   }
   ```
 
+### Get Jar Reasons (`/api/ml-jar/all`)
+**`GET /api/ml-jar/all?limit=20&cursor=last_id`**
+* **Headers:** `x-user-id`, `Authorization: Bearer <token>`
+* **Success (200) Response JSON:**
+  ```json
+  {
+    "data": [
+      {
+        "id": "string",
+        "coupleId": "string",
+        "creatorId": "string",
+        "content": "string",
+        "category": "string | null",
+        "createdAt": "string",
+        "creator": {
+          "displayName": "string"
+        }
+      }
+    ],
+    "nextCursor": "string | null"
+  }
+  ```
+
 ### Timeline Events (`/api/ml-timeline/create`)
 * **Request JSON:**
   ```json
@@ -500,22 +523,56 @@ interface TimelineEvent {
 
 ---
 
-## 7. Generic File Upload
+## 7. Unified Media Uploads
 **`POST /api/upload`**
 > [!IMPORTANT]
-> This is a **multipart/form-data** request for uploading avatars, timeline media, letters, or temp files.
+> This is a **multipart/form-data** request for handling all central uploads EXCEPT avatars (which continues to use `/api/user/avatar`).
 
 * **Headers:** `x-user-id`, `Authorization: Bearer <token>`
 * **Body Fields:**
-  * `file`: (File blob)
-  * `bucket`: "avatars | chat-media | timeline | letters | temp" (Default: "temp")
-  * `folder`: "string" (Default: userId)
+  * `file`: (File blob, Required)
+  * `bucket`: `"chat-media" | "timeline" | "letters" | "temp"` (Default: "temp")
+  * `coupleId`: "string" (Required for `chat-media`, `timeline`, `letters`)
+  * `generateThumbnail`: "true" | "false"
+  * `caption`: "string" (Optional, for `chat-media`)
+  * `title`: "string" (Optional, for `timeline`)
+  * `description`: "string" (Optional, for `timeline`)
+  * `type`: "string" (Optional, for `timeline` event types)
+  * `letterId`: "string" (Optional, for `letters` attachments)
 * **Success (200) Response JSON:**
   ```json
   {
-    "url": "https://<supabase-url>/storage/v1/object/public/<bucket>/path/to/file",
-    "path": "path/to/file",
-    "bucket": "string"
+    "success": true,
+    "file": {
+      "id": "string (MediaFile ID)",
+      "url": "string",
+      "path": "string",
+      "bucket": "string",
+      "size": 1048576,
+      "type": "image/jpeg",
+      "name": "filename.jpg"
+    },
+    "thumbnail": {
+      "url": "string",
+      "path": "string"
+    } /* or null */,
+    "message": { /* Populated Message object if bucket was chat-media */ } /* or null */,
+    "timelineEvent": { /* Populated TimelineEvent if bucket was timeline */ } /* or null */,
+    "letter": { /* Populated Letter if bucket was letters */ } /* or null */
+  }
+  ```
+
+### Check Upload Status
+**`GET /api/upload/status?id=file_id`**
+* **Headers:** `x-user-id`, `Authorization: Bearer <token>`
+* **Success (200) Response JSON:**
+  ```json
+  {
+    "id": "string",
+    "url": "string",
+    "type": "string",
+    "size": 1024,
+    "createdAt": "string"
   }
   ```
 
