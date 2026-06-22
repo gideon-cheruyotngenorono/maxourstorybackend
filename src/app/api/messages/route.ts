@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { requireAdmin } from '@/lib/admin'
+import { broadcastToChannel } from '@/lib/supabase'
+import { dispatchNotification } from '@/services/notification'
 
-// GET: Fetch messages
+// GET: Fetch messages (cursor-based pagination for infinite scroll)
 export async function GET(request: NextRequest) {
   try {
     const userId = request.headers.get('x-user-id')
@@ -12,15 +13,12 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const coupleId = searchParams.get('coupleId')
-    const limit = parseInt(searchParams.get('limit') || '50')
-    const page = parseInt(searchParams.get('page') || '1')
-    const skip = (page - 1) * limit
+    const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100)
+    // cursor-based pagination: pass the oldest message id you have to get older ones
+    const cursor = searchParams.get('cursor') // message id to paginate from
 
     if (!coupleId) {
-      return NextResponse.json(
-        { error: 'coupleId is required' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'coupleId is required' }, { status: 400 })
     }
 
     // Verify user is part of this couple or is admin
@@ -28,20 +26,15 @@ export async function GET(request: NextRequest) {
       where: { id: userId },
       select: { role: true },
     })
-
     const isAdmin = user?.role === 'admin'
 
     if (!isAdmin) {
       const couple = await prisma.couple.findFirst({
         where: {
           id: coupleId,
-          OR: [
-            { partnerAId: userId },
-            { partnerBId: userId },
-          ],
+          OR: [{ partnerAId: userId }, { partnerBId: userId }],
         },
       })
-
       if (!couple) {
         return NextResponse.json(
           { error: 'Unauthorized: Not part of this couple' },
@@ -50,63 +43,54 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Fetch messages
+    // Cursor-based keyset pagination (much more efficient than OFFSET for chat history)
     const messages = await prisma.message.findMany({
       where: {
         coupleId,
         isDeleted: false,
+        ...(cursor
+          ? {
+              createdAt: {
+                lt: (await prisma.message.findUnique({ where: { id: cursor }, select: { createdAt: true } }))?.createdAt,
+              },
+            }
+          : {}),
       },
       include: {
         sender: {
+          select: { id: true, displayName: true, avatarUrl: true },
+        },
+        reactions: {
+          select: { id: true, userId: true, emoji: true },
+        },
+        replyTo: {
           select: {
             id: true,
-            displayName: true,
-            avatarUrl: true,
-          },
-        },
-        reactions: true,
-        replies: {
-          include: {
-            sender: {
-              select: {
-                id: true,
-                displayName: true,
-              },
-            },
+            content: true,
+            type: true,
+            sender: { select: { id: true, displayName: true } },
           },
         },
       },
       orderBy: { createdAt: 'desc' },
-      skip,
       take: limit,
     })
 
-    const total = await prisma.message.count({
-      where: {
-        coupleId,
-        isDeleted: false,
-      },
-    })
+    // Oldest message id becomes the next cursor for loading older history
+    const nextCursor = messages.length === limit ? messages[messages.length - 1].id : null
 
     return NextResponse.json({
       messages,
-      pagination: {
-        page,
-        limit,
-        total,
-        pages: Math.ceil(total / limit),
-      },
+      nextCursor,
+      hasMore: nextCursor !== null,
     })
   } catch (error) {
     console.error('Error fetching messages:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch messages' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Failed to fetch messages' }, { status: 500 })
   }
 }
 
-// POST: Send a message
+// POST: Send a text message
 export async function POST(request: NextRequest) {
   try {
     const userId = request.headers.get('x-user-id')
@@ -128,10 +112,7 @@ export async function POST(request: NextRequest) {
     const couple = await prisma.couple.findFirst({
       where: {
         id: coupleId,
-        OR: [
-          { partnerAId: userId },
-          { partnerBId: userId },
-        ],
+        OR: [{ partnerAId: userId }, { partnerBId: userId }],
       },
     })
 
@@ -149,29 +130,40 @@ export async function POST(request: NextRequest) {
         senderId: userId,
         content,
         type: type || 'TEXT',
-        replyToId,
+        replyToId: replyToId || null,
         status: 'SENT',
       },
       include: {
         sender: {
-          select: {
-            id: true,
-            displayName: true,
-            avatarUrl: true,
-          },
+          select: { id: true, displayName: true, avatarUrl: true },
         },
       },
     })
 
-    // TODO: Send real-time notification to partner
-    // await notifyPartner(coupleId, message)
+    // Fire realtime broadcast so partner receives message instantly
+    broadcastToChannel(`chat_${coupleId}`, 'new_message', { message })
+
+    // Send FCM push notification to partner (fire-and-forget)
+    const recipientId =
+      couple.partnerAId === userId ? couple.partnerBId : couple.partnerAId
+    if (recipientId) {
+      const senderName = message.sender?.displayName || 'Your partner'
+      dispatchNotification({
+        userId: recipientId,
+        type: 'NEW_MESSAGE',
+        title: `💬 ${senderName}`,
+        body: (content as string).slice(0, 80),
+        data: {
+          coupleId,
+          messageId: message.id,
+          screen: 'Chat',
+        },
+      })
+    }
 
     return NextResponse.json(message, { status: 201 })
   } catch (error) {
     console.error('Error sending message:', error)
-    return NextResponse.json(
-      { error: 'Failed to send message' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Failed to send message' }, { status: 500 })
   }
 }

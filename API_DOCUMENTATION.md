@@ -273,26 +273,9 @@ interface TimelineEvent {
 
 ---
 
-## 3. Media Upload (Chat & Others)
-
-### Upload File
-**`POST /api/ml-storage/upload`**
-> [!IMPORTANT]
-> This is a **multipart/form-data** request!
-
-* **Headers:** `Authorization: Bearer <token>`
-* **Body Fields:**
-  * `file`: (File blob)
-  * `type`: (String) one of `IMAGE`, `VIDEO`, `AUDIO`, `FILE`
-* **Success (200) Response JSON:**
-  ```json
-  {
-    "success": true,
-    "url": "string (The public URL of the uploaded media)",
-    "size": "number (Bytes)",
-    "originalName": "string"
-  }
-  ```
+## 3. Media Upload
+> [!NOTE]
+> The old `/api/ml-storage/upload` endpoint is deprecated. Please refer to **Section 7. Unified Media Uploads** (`/api/upload`) for all media capabilities (chat, timeline, temp).
 
 ---
 
@@ -473,9 +456,16 @@ interface TimelineEvent {
 
 ## 6. Unified Messaging Endpoints
 
-### Get Messages (Paginated)
-**`GET /api/messages?coupleId=string&limit=50&page=1`**
+### Get Messages (Cursor-based Pagination)
+**`GET /api/messages?coupleId=string&limit=50&cursor=last_msg_id`**
+> [!TIP]
+> Use cursor-based pagination for infinite scroll. Pass the `nextCursor` from each response as `cursor` in the next call to load older messages. Do NOT use `page` offset.
+
 * **Headers:** `x-user-id`, `Authorization: Bearer <token>`
+* **Query Params:**
+  * `coupleId`: string (required)
+  * `limit`: number (default: 50, max: 100)
+  * `cursor`: string (message ID — pass to load older messages)
 * **Success (200) Response JSON:**
   ```json
   {
@@ -484,18 +474,23 @@ interface TimelineEvent {
         "id": "string",
         "coupleId": "string",
         "content": "string",
-        "type": "TEXT | IMAGE | VIDEO ...",
-        "sender": { "id": "string", "displayName": "string", "avatarUrl": "string" },
-        "reactions": [],
-        "replies": []
+        "type": "TEXT | IMAGE | VIDEO | AUDIO | FILE | SYSTEM",
+        "status": "SENT | DELIVERED | READ",
+        "sender": { "id": "string", "displayName": "string", "avatarUrl": "string | null" },
+        "reactions": [ { "id": "string", "userId": "string", "emoji": "string" } ],
+        "replyTo": { "id": "string", "content": "string", "type": "string", "sender": { "id": "string", "displayName": "string" } }
       }
     ],
-    "pagination": { "page": 1, "limit": 50, "total": 100, "pages": 2 }
+    "nextCursor": "string | null",
+    "hasMore": true
   }
   ```
 
 ### Send Text Message
 **`POST /api/messages`**
+> [!NOTE]
+> On success, the backend automatically broadcasts a `new_message` event to the partner via Supabase Realtime. The frontend should listen to `chat_{coupleId}` channel for this event.
+
 * **Headers:** `x-user-id`, `Authorization: Bearer <token>`, `Content-Type: application/json`
 * **Request JSON:**
   ```json
@@ -506,20 +501,27 @@ interface TimelineEvent {
     "replyToId": "string (optional)"
   }
   ```
-* **Success (201) Response JSON:** `Message` object
+* **Success (201) Response JSON:** Full `Message` object with populated `sender`.
 
 ### Send Media Message
-**`POST /api/messages/media`**
-> [!IMPORTANT]
-> This is a **multipart/form-data** request.
+**`POST /api/upload` (via bucket `chat-media`)**
+> [!NOTE]
+> Media messaging now flows through the Unified Media Upload endpoint.
 
 * **Headers:** `x-user-id`, `Authorization: Bearer <token>`
-* **Body Fields:**
+* **Body Fields (multipart/form-data):**
   * `file`: (File blob)
+  * `bucket`: `"chat-media"`
   * `coupleId`: "string"
   * `caption`: "string (optional)"
-  * `replyToId`: "string (optional)"
-* **Success (201) Response JSON:** `Message` object containing populated `mediaUrl`.
+* **Success (200) Response JSON:** 
+  ```json
+  {
+    "success": true,
+    "file": { /* MediaFile info */ },
+    "message": { /* Fully populated Message object */ }
+  }
+  ```
 
 ---
 
@@ -601,3 +603,129 @@ interface TimelineEvent {
 **`GET /api/admin/logs`**
 * **Response:** Array of `AdminAuditLog` tracking what changes admins have made.
 
+---
+
+## 9. Real-Time Presence (Typing / Recording / Online)
+
+> [!IMPORTANT]
+> These endpoints use **Supabase Realtime Broadcast**. The partner's device receives events INSTANTLY via WebSocket — nothing is written to the database. The frontend must subscribe to the `chat_{coupleId}` Supabase channel to receive these events.
+
+### Broadcast Presence Event
+**`POST /api/chat/presence`**
+* **Headers:** `x-user-id`, `Authorization: Bearer <token>`, `Content-Type: application/json`
+* **Request JSON:**
+  ```json
+  {
+    "type": "typing | recording | online | offline",
+    "isActive": true
+  }
+  ```
+* **Success (200) Response JSON:**
+  ```json
+  { "success": true, "broadcasted": "typing" }
+  ```
+* **Realtime Event fired on `chat_{coupleId}` channel:**
+  ```json
+  {
+    "event": "presence",
+    "payload": {
+      "userId": "string",
+      "type": "typing | recording | online | offline",
+      "isActive": true,
+      "timestamp": "ISO 8601 string"
+    }
+  }
+  ```
+
+**Usage flow:**
+1. User starts typing → `POST /api/chat/presence` with `{ "type": "typing", "isActive": true }`
+2. User stops typing → `POST /api/chat/presence` with `{ "type": "typing", "isActive": false }`
+3. User starts recording audio → `POST /api/chat/presence` with `{ "type": "recording", "isActive": true }`
+
+---
+
+## 10. Online Status (Heartbeat)
+
+### Update And Broadcast Online Status
+**`POST /api/chat/heartbeat`**
+> Call this every 30 seconds while the chat screen is open to mark the user as "online".
+
+* **Headers:** `x-user-id`, `Authorization: Bearer <token>`
+* **Body:** Empty `{}` or no body needed
+* **Success (200) Response JSON:**
+  ```json
+  { "success": true, "lastSeen": "2026-06-22T17:00:00.000Z" }
+  ```
+
+### Check If Partner Is Online
+**`GET /api/chat/heartbeat?partnerId=string`**
+* **Headers:** `x-user-id`, `Authorization: Bearer <token>`
+* **Success (200) Response JSON:**
+  ```json
+  {
+    "partnerId": "string",
+    "displayName": "string",
+    "isOnline": true,
+    "lastSeen": "2026-06-22T17:00:00.000Z",
+    "lastSeenSeconds": 12
+  }
+  ```
+> `isOnline` is `true` if the partner was seen within the **last 60 seconds**.
+
+---
+
+## 11. Partner Auto-Detection
+
+### Get Partner Email / Profile From Couple
+**`GET /api/ml-couple/partner-email`**
+> Auto-detects the other partner in the couple. Useful for invite flows; shows partner email without requiring the user to enter it manually.
+
+* **Headers:** `x-user-id`, `Authorization: Bearer <token>`
+* **Success (200) Response JSON:**
+  ```json
+  {
+    "coupleId": "string",
+    "me": { "id": "string", "email": "string", "displayName": "string", "avatarUrl": "string | null" },
+    "partner": { "id": "string", "email": "string", "displayName": "string", "avatarUrl": "string | null" }
+  }
+  ```
+  If partner has not joined yet:
+  ```json
+  {
+    "coupleId": "string",
+    "inviteCode": "string",
+    "me": { "..." },
+    "partner": null,
+    "message": "No partner has joined yet."
+  }
+  ```
+
+---
+
+## Developer Tip: Frontend Supabase Real-Time Channel Setup
+
+```javascript
+// Subscribe to the couple's channel for all real-time events
+const channel = supabase.channel(`chat_${coupleId}`)
+
+// 1. New messages sent by partner (via /api/messages POST or /api/ml-chat/send)
+channel.on('broadcast', { event: 'new_message' }, ({ payload }) => {
+  // payload.message = full Message object
+  addMessageToLocalDB(payload.message)
+})
+
+// 2. Read receipts
+channel.on('broadcast', { event: 'read_receipt' }, ({ payload }) => {
+  // payload.messageIds = array of marked-read message ids
+  markMessagesRead(payload.messageIds)
+})
+
+// 3. Typing / Recording / Online presence 
+channel.on('broadcast', { event: 'presence' }, ({ payload }) => {
+  if (payload.type === 'typing') showTypingIndicator(payload.isActive)
+  if (payload.type === 'recording') showRecordingIndicator(payload.isActive)
+  if (payload.type === 'online') updatePartnerOnlineStatus(payload.isActive)
+})
+
+channel.subscribe()
+```
