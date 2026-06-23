@@ -2,48 +2,50 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { broadcastToChannel } from '@/lib/supabase'
 import { dispatchNotification } from '@/services/notification'
+import { getCoupleForUser, getPartnerId } from '@/lib/couple-context'
 
-// GET: Fetch messages (cursor-based pagination for infinite scroll)
+// GET: Fetch messages (cursor-based pagination)
+// coupleId is OPTIONAL — omit it and the backend detects your couple automatically
 export async function GET(request: NextRequest) {
   try {
     const userId = request.headers.get('x-user-id')
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { searchParams } = new URL(request.url)
-    const coupleId = searchParams.get('coupleId')
     const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100)
-    // cursor-based pagination: pass the oldest message id you have to get older ones
-    const cursor = searchParams.get('cursor') // message id to paginate from
+    const cursor = searchParams.get('cursor')
 
-    if (!coupleId) {
-      return NextResponse.json({ error: 'coupleId is required' }, { status: 400 })
-    }
+    // coupleId is optional in the query — auto-detect from userId if omitted
+    let coupleId = searchParams.get('coupleId')
 
-    // Verify user is part of this couple or is admin
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { role: true },
+      select: { role: true, coupleId: true }
     })
     const isAdmin = user?.role === 'admin'
 
-    if (!isAdmin) {
-      const couple = await prisma.couple.findFirst({
-        where: {
-          id: coupleId,
-          OR: [{ partnerAId: userId }, { partnerBId: userId }],
-        },
-      })
-      if (!couple) {
-        return NextResponse.json(
-          { error: 'Unauthorized: Not part of this couple' },
-          { status: 403 }
-        )
+    if (!coupleId) {
+      // Auto-detect: use cached coupleId from user record
+      if (!user?.coupleId) {
+        const couple = await getCoupleForUser(userId)
+        if (!couple) return NextResponse.json({ error: 'No couple found for this user' }, { status: 404 })
+        coupleId = couple.id
+      } else {
+        coupleId = user.coupleId
       }
     }
 
-    // Cursor-based keyset pagination (much more efficient than OFFSET for chat history)
+    if (!isAdmin) {
+      // Verify they actually belong to this couple
+      const belongs = await prisma.couple.findFirst({
+        where: {
+          id: coupleId,
+          OR: [{ partnerAId: userId }, { partnerBId: userId }]
+        }
+      })
+      if (!belongs) return NextResponse.json({ error: 'Unauthorized: Not part of this couple' }, { status: 403 })
+    }
+
     const messages = await prisma.message.findMany({
       where: {
         coupleId,
@@ -57,17 +59,11 @@ export async function GET(request: NextRequest) {
           : {}),
       },
       include: {
-        sender: {
-          select: { id: true, displayName: true, avatarUrl: true },
-        },
-        reactions: {
-          select: { id: true, userId: true, emoji: true },
-        },
+        sender: { select: { id: true, displayName: true, avatarUrl: true } },
+        reactions: { select: { id: true, userId: true, emoji: true } },
         replyTo: {
           select: {
-            id: true,
-            content: true,
-            type: true,
+            id: true, content: true, type: true,
             sender: { select: { id: true, displayName: true } },
           },
         },
@@ -76,14 +72,9 @@ export async function GET(request: NextRequest) {
       take: limit,
     })
 
-    // Oldest message id becomes the next cursor for loading older history
     const nextCursor = messages.length === limit ? messages[messages.length - 1].id : null
 
-    return NextResponse.json({
-      messages,
-      nextCursor,
-      hasMore: nextCursor !== null,
-    })
+    return NextResponse.json({ messages, nextCursor, hasMore: nextCursor !== null })
   } catch (error) {
     console.error('Error fetching messages:', error)
     return NextResponse.json({ error: 'Failed to fetch messages' }, { status: 500 })
@@ -91,49 +82,38 @@ export async function GET(request: NextRequest) {
 }
 
 // POST: Send a text message
+// coupleId is OPTIONAL in the body — auto-detected from userId if omitted
 export async function POST(request: NextRequest) {
   try {
     const userId = request.headers.get('x-user-id')
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const body = await request.json()
-    const { coupleId, content, type, replyToId } = body
+    const { content, type, replyToId } = body
 
-    if (!coupleId || !content) {
-      return NextResponse.json(
-        { error: 'coupleId and content are required' },
-        { status: 400 }
-      )
+    if (!content) return NextResponse.json({ error: 'content is required' }, { status: 400 })
+
+    // Auto-detect couple — coupleId in body is optional
+    let couple = null
+    if (body.coupleId) {
+      // They passed it explicitly — verify membership
+      couple = await prisma.couple.findFirst({
+        where: { id: body.coupleId, OR: [{ partnerAId: userId }, { partnerBId: userId }] }
+      })
+    } else {
+      // Auto-detect from userId
+      couple = await getCoupleForUser(userId)
     }
 
-    // Verify user is part of this couple
-    const couple = await prisma.couple.findFirst({
-      where: {
-        id: coupleId,
-        OR: [{ partnerAId: userId }, { partnerBId: userId }],
-      },
-    })
-
-    if (!couple) {
-      return NextResponse.json(
-        { error: 'Unauthorized: Not part of this couple' },
-        { status: 403 }
-      )
-    }
+    if (!couple) return NextResponse.json({ error: 'No couple found for this user' }, { status: 404 })
 
     if (couple.isBlocked) {
-      return NextResponse.json(
-        { error: 'Communication is currently blocked' },
-        { status: 403 }
-      )
+      return NextResponse.json({ error: 'Communication is currently blocked' }, { status: 403 })
     }
 
-    // Create message
     const message = await prisma.message.create({
       data: {
-        coupleId,
+        coupleId: couple.id,
         senderId: userId,
         content,
         type: type || 'TEXT',
@@ -141,18 +121,15 @@ export async function POST(request: NextRequest) {
         status: 'SENT',
       },
       include: {
-        sender: {
-          select: { id: true, displayName: true, avatarUrl: true },
-        },
+        sender: { select: { id: true, displayName: true, avatarUrl: true } },
       },
     })
 
-    // Fire realtime broadcast so partner receives message instantly
-    broadcastToChannel(`chat_${coupleId}`, 'new_message', { message })
+    // Broadcast to partner via Supabase Realtime
+    broadcastToChannel(`chat_${couple.id}`, 'new_message', { message })
 
-    // Send FCM push notification to partner (fire-and-forget)
-    const recipientId =
-      couple.partnerAId === userId ? couple.partnerBId : couple.partnerAId
+    // Push notification to partner
+    const recipientId = getPartnerId(couple, userId)
     if (recipientId) {
       const senderName = message.sender?.displayName || 'Your partner'
       dispatchNotification({
@@ -160,11 +137,7 @@ export async function POST(request: NextRequest) {
         type: 'NEW_MESSAGE',
         title: `💬 ${senderName}`,
         body: (content as string).slice(0, 80),
-        data: {
-          coupleId,
-          messageId: message.id,
-          screen: 'Chat',
-        },
+        data: { coupleId: couple.id, messageId: message.id, screen: 'Chat' },
       })
     }
 

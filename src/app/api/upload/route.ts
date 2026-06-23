@@ -9,6 +9,7 @@ import {
   getMessageType,
   UPLOAD_CONFIGS,
 } from '@/lib/upload-utils'
+import { getCoupleForUser } from '@/lib/couple-context'
 
 // Helper to extract user ID from request
 function getUserId(request: NextRequest): string | null {
@@ -69,9 +70,18 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData()
     const file = formData.get('file') as File
     const bucket = (formData.get('bucket') as string) || 'temp'
-    const coupleId = formData.get('coupleId') as string || null
+    let coupleId = formData.get('coupleId') as string || null
     const folder = formData.get('folder') as string || null
     const generateThumbnail = formData.get('generateThumbnail') === 'true'
+
+    // Auto-detect coupleId from userId when not provided (for couple-scoped buckets)
+    if (!coupleId && ['chat-media', 'timeline', 'letters'].includes(bucket)) {
+      const couple = await getCoupleForUser(userId)
+      if (!couple) {
+        return NextResponse.json({ error: 'No couple found for this user' }, { status: 404 })
+      }
+      coupleId = couple.id
+    }
 
     // Validate file exists
     if (!file) {
