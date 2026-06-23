@@ -54,6 +54,8 @@ model Couple {
   partnerBId       String?
   anniversaryDate  DateTime?
   inviteCode       String?          @unique
+  isBlocked        Boolean          @default(false)
+  blockedById      String?
   createdAt        DateTime         @default(now())
   partnerA         User             @relation("PartnerA", fields: [partnerAId], references: [id])
   partnerB         User?            @relation("PartnerB", fields: [partnerBId], references: [id])

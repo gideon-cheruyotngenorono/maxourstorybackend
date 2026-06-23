@@ -68,6 +68,7 @@ export async function GET(req: Request) {
       daysTogether,
       anniversaryDate: couple.anniversaryDate,
       createdAt: couple.createdAt,
+      isBlocked: couple.isBlocked,
     }, { status: 200 });
 
   } catch (error: any) {

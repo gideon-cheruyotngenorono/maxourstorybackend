@@ -186,6 +186,22 @@ interface TimelineEvent {
   }
   ```
 
+### Logout
+**`POST /api/auth/logout`**
+* **Headers:** `x-user-id`
+* **Request JSON:**
+  ```json
+  {
+    "refreshToken": "string"
+  }
+  ```
+* **Success (200) Response JSON:** `{ "message": "Logged out successfully" }`
+
+### Logout All Devices
+**`POST /api/auth/logout-all`**
+* **Headers:** `x-user-id`
+* **Success (200) Response JSON:** `{ "message": "Successfully logged out from all devices" }`
+
 ### Google Auth
 **`POST /api/auth/google`**
 * **Headers:** `Content-Type: application/json`
@@ -367,7 +383,16 @@ interface TimelineEvent {
   * **Request JSON:** `{ "inviteCode": "string" }`
   * **Response JSON:** `{ "message": "...", "couple": { "id": "...", ... } }`
 * **Get Couple Profile (`GET /api/ml-couple/profile`)**
-  * **Response JSON:** `{ "coupleId": "string", "partnerA": { ... }, "partnerB": { ... } | null, "daysTogether": number }`
+  * **Response JSON:** `{ "coupleId": "string", "partnerA": { ... }, "partnerB": { ... } | null, "daysTogether": number, "isBlocked": boolean }`
+
+### Block / Unblock Partner
+* **Block Partner (`POST /api/ml-couple/block`)**
+  * **Headers:** `x-user-id`
+  * **Response JSON:** `{ "success": true, "message": "Partner has been blocked successfully", "couple": { "isBlocked": true, "blockedById": "..." } }`
+* **Unblock Partner (`POST /api/ml-couple/unblock`)**
+  * **Headers:** `x-user-id`
+  * **Response JSON:** `{ "success": true, "message": "Partner has been unblocked", "couple": { "isBlocked": false, "blockedById": null } }`
+  * *Note: Only the user who initiated the block can unblock.*
 
 ### Notes (`/api/ml-notes/create`)
 * **Request JSON:**

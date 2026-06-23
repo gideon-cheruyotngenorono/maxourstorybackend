@@ -1,40 +1,36 @@
 import { NextResponse } from 'next/server';
+import prisma from '@/lib/prisma';
 
-export async function POST() {
+export async function POST(req: Request) {
   try {
-    const { cookies } = require('next/headers');
-    const cookieStore = await cookies();
-    const refreshToken = cookieStore.get('refresh_token')?.value;
+    const userId = req.headers.get('x-user-id');
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    if (refreshToken) {
-      const crypto = require('crypto');
-      const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
-      const prisma = require('@/lib/prisma').default;
-      
-      try {
-        await prisma.refreshToken.update({
-          where: { tokenHash },
-          data: { revokedAt: new Date() }
-        });
-      } catch (e) {
-        // Ignore errors if token doesn't exist
-      }
+    // Ensure the token hash is provided to revoke the specific session
+    let tokenHash: string | undefined;
+    try {
+      const body = await req.json();
+      tokenHash = body.refreshToken;
+    } catch (e) {
+      // Ignored
     }
 
-    const response = NextResponse.json({ message: 'Logged out successfully' }, { status: 200 });
-    
-    // Clear the http-only refresh token cookie
-    response.cookies.set('refresh_token', '', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 0,
-      path: '/',
+    if (!tokenHash) {
+      return NextResponse.json({ error: 'Refresh token is required to logout' }, { status: 400 });
+    }
+
+    // Delete the specific token for the user
+    await prisma.refreshToken.deleteMany({
+      where: {
+        userId,
+        tokenHash,
+      }
     });
 
-    return response;
+    return NextResponse.json({ message: 'Logged out successfully' }, { status: 200 });
+
   } catch (error: any) {
     console.error('[AUTH_LOGOUT]', error);
-    return NextResponse.json({ error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

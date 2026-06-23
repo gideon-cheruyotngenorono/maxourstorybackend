@@ -123,6 +123,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    if (couple.isBlocked) {
+      return NextResponse.json(
+        { error: 'Communication is currently blocked' },
+        { status: 403 }
+      )
+    }
+
     // Create message
     const message = await prisma.message.create({
       data: {

@@ -98,6 +98,20 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Guard: Prevent uploads to communication buckets if couple is blocked
+    if (['chat-media', 'timeline', 'letters'].includes(bucket) && coupleId) {
+      const couple = await prisma.couple.findUnique({
+        where: { id: coupleId },
+        select: { isBlocked: true }
+      });
+      if (couple?.isBlocked) {
+        return NextResponse.json(
+          { error: 'Communication is currently blocked' },
+          { status: 403 }
+        )
+      }
+    }
+
     // For avatars - handled elsewhere
     if (bucket === 'avatars') {
       return NextResponse.json(
