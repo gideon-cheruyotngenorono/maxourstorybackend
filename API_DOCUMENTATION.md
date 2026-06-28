@@ -1,6 +1,6 @@
 # Our Story API Integration Guide (Exhaustive Contract)
 
-Base URL: `https://maxourstorybackend.vercel.app`
+Base URL: `https://maxourstorybackend.vercel.app` (or your local/deployment URL)
 
 ## Global Rules & Headers
 
@@ -40,484 +40,240 @@ interface Couple {
 }
 
 interface Message {
-  id: string;
-  coupleId: string;
-  senderId: string;
+  id: string; coupleId: string; senderId: string;
   content: string | null;
   type: "TEXT" | "IMAGE" | "VIDEO" | "AUDIO" | "FILE" | "SYSTEM";
   status: "SENT" | "DELIVERED" | "READ";
-  mediaUrl: string | null;
-  thumbnailUrl: string | null;
-  fileName: string | null;
-  fileSize: number | null;
-  duration: number | null;
-  mimeType: string | null;
-  size: number | null;
-  isEdited: boolean;
-  isDeleted: boolean;
-  readAt: string | null;
-  replyToId: string | null;
-  createdAt: string;
-  updatedAt: string;
-  sender?: { id: string; displayName: string; avatarUrl: string | null; };
-  reactions?: { id: string; userId: string; emoji: string; }[];
-  replyTo?: { id: string; content: string; type: string; sender: { id: string; displayName: string; } } | null;
+  mediaUrl: string | null; thumbnailUrl: string | null;
+  fileName: string | null; fileSize: number | null;
+  duration: number | null; mimeType: string | null;
+  isEdited: boolean; isDeleted: boolean; readAt: string | null;
+  replyToId: string | null; createdAt: string; updatedAt: string;
 }
 
-interface Note {
-  id: string; coupleId: string; creatorId: string;
-  title: string | null; content: string;
-  isPinned: boolean; isArchived: boolean;
-  createdAt: string; updatedAt: string;
-}
-
-interface Prayer {
-  id: string; coupleId: string; creatorId: string;
-  content: string; category: string;
-  isAnswered: boolean; isArchived: boolean;
-  createdAt: string; updatedAt: string;
-}
-
-interface GratitudeEntry {
-  id: string; coupleId: string; userId: string;
-  content: string; date: string;
-  isShared: boolean; createdAt: string;
-}
-
-interface JarReason {
-  id: string; coupleId: string; creatorId: string;
-  content: string; category: string | null; createdAt: string;
-}
-
-interface TimelineEvent {
-  id: string; coupleId: string; title: string;
-  description: string | null; date: string;
-  type: string; mediaUrl: string | null;
-  userId: string | null; createdAt: string;
-}
+// See more specific models mapped implicitly via the Zod validators for Note, Prayer, Letter, TimelineEvent, GratitudeEntry, JarReason, and more.
 ```
 
 ---
 
 ## 1. Authentication Endpoints
 
-### Register
-**`POST /api/auth/register`**
-* **Headers:** `Content-Type: application/json`
-* **Request JSON:**
-  ```json
-  { "email": "string", "password": "string", "displayName": "string" }
-  ```
-* **Success (201) Response JSON:**
-  ```json
-  {
-    "message": "Registration successful",
-    "user": { "id": "string", "email": "string", "displayName": "string" },
-    "accessToken": "string",
-    "reqId": "string"
-  }
-  ```
-
-### Login
-**`POST /api/auth/login`**
-* **Headers:** `Content-Type: application/json`
-* **Request JSON:** `{ "email": "string", "password": "string" }`
-* **Success (200) Response JSON:**
-  ```json
-  {
-    "message": "Login successful",
-    "user": { "id": "string", "email": "string", "displayName": "string", "avatarUrl": "string | null", "avatarInitials": "string | null" },
-    "accessToken": "string"
-  }
-  ```
-
-### Google Auth
-**`POST /api/auth/google`**
-* **Headers:** `Content-Type: application/json`
-* **Request JSON:**
-  ```json
-  { "idToken": "string", "displayName": "string (optional)", "avatarUrl": "string (optional)" }
-  ```
-* **Success (200/201) Response JSON:**
-  ```json
-  {
-    "message": "string",
-    "user": { "id": "string", "email": "string", "displayName": "string", "avatarUrl": "string | null", "avatarInitials": "string | null" },
-    "accessToken": "string",
-    "isNewUser": true
-  }
-  ```
-
-### Logout (Single Device)
-**`POST /api/auth/logout`**
-* **Headers:** `x-user-id`
-* **Request JSON:** `{ "refreshToken": "string" }`
-* **Success (200) Response JSON:** `{ "message": "Logged out successfully" }`
-
-### Logout All Devices
-**`POST /api/auth/logout-all`**
-* **Headers:** `x-user-id`
-* **No body required.**
-* **Success (200) Response JSON:** `{ "message": "Successfully logged out from all devices" }`
-> Also clears all device FCM tokens — push notifications stop immediately on all old devices.
-
-### Forgot Password
-**`POST /api/auth/forgot-password`**
-* **No auth headers.** Body: `{ "email": "string" }`
-* The 6-digit PIN is sent **strictly via email**. It is never in the API response.
-* **Success (200) Response JSON:** `{ "success": true, "message": "If an account exists, a reset link was sent." }`
-
-### Reset Password
-**`POST /api/auth/reset-password`**
-* **No auth headers.** Body: `{ "token": "string", "newPassword": "string" }`
-* **Success (200) Response JSON:** `{ "message": "Password reset successfully" }`
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/auth/register` | Body: `{ email, password, displayName }`. Returns tokens. |
+| `POST` | `/api/auth/login` | Body: `{ email, password }`. Returns tokens. |
+| `POST` | `/api/auth/google` | Body: `{ idToken, displayName?, avatarUrl? }`. Returns tokens. |
+| `POST` | `/api/auth/logout` | Header: `x-user-id`. Body: `{ refreshToken }` |
+| `POST` | `/api/auth/logout-all` | Header: `x-user-id`. Clears all device registrations. |
+| `POST` | `/api/auth/refresh` | **No auth headers required**, just `RefreshToken` in request (if implemented that way) or body. |
+| `POST` | `/api/auth/forgot-password` | Body: `{ email }`. Sends reset PIN via email. |
+| `POST` | `/api/auth/reset-password` | Body: `{ token, newPassword }`. Uses the PIN from email. |
 
 ---
 
 ## 2. User & Profile Endpoints
 
-### Get Profile
-**`GET /api/user/profile`**
-* **Headers:** `x-user-id`, `Authorization: Bearer <token>`
-* **Success (200) Response JSON:**
-  ```json
-  { "id": "string", "displayName": "string", "email": "string", "avatarUrl": "string | null", "createdAt": "string", "avatarInitials": "string | null" }
-  ```
-
-### Update Profile
-**`PATCH /api/user/profile`**
-* **Headers:** `x-user-id`, `Authorization: Bearer <token>`, `Content-Type: application/json`
-* **Request JSON:** `{ "displayName": "string (optional)", "avatarUrl": "string (optional)" }`
-* **Success (200) Response JSON:** Same as Get Profile.
-
-### Upload Avatar
-**`POST /api/user/avatar`**
-> [!IMPORTANT]
-> **multipart/form-data** — Do NOT set `Content-Type` manually.
-
-* **Headers:** `Authorization: Bearer <token>`
-* **Body:** `multipart/form-data`, field name: **`avatar`**
-* **Success (200) Response JSON:**
-  ```json
-  { "success": true, "avatarUrl": "string", "message": "Avatar uploaded successfully" }
-  ```
-
-### Delete Avatar
-**`DELETE /api/user/avatar`**
-* **Headers:** `Authorization: Bearer <token>`
-* **Success (200) Response JSON:** `{ "success": true, "message": "Avatar deleted successfully" }`
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET`  | `/api/user/profile` | Fetches the current user profile. |
+| `PATCH`| `/api/user/profile` | Body: `{ displayName?, avatarUrl? }`. Updates profile. |
+| `POST` | `/api/user/avatar` | **multipart/form-data** upload (key: `avatar`). Returns `avatarUrl`. |
+| `DELETE`| `/api/user/account` | Deletes user account and cascade soft/hard deletes their data. |
 
 ---
 
 ## 3. Couple Lifecycle
 
-### Create Couple (generates invite code)
-**`POST /api/ml-couple/create`**
-* **Headers:** `x-user-id`, `Authorization: Bearer <token>`, `Content-Type: application/json`
-* **Request JSON:** `{ "partnerEmail": "string (optional)" }`
-  - If `partnerEmail` is provided, backend sends them an invite email automatically.
-  - If not, the `inviteCode` in the response is all you need — display it to the user.
-* **Success (201) Response JSON:**
-  ```json
-  {
-    "message": "Pending couple created successfully!",
-    "inviteCode": "8B5FA3",
-    "couple": { "id": "string", "partnerAId": "string", "partnerBId": null, "inviteCode": "8B5FA3", "isBlocked": false, "blockedById": null, "createdAt": "string" }
-  }
-  ```
+> **Automatic resolution via `x-user-id`**
 
-### Join Couple via Invite Code
-**`POST /api/ml-couple/join`**
-* **Headers:** `x-user-id`, `Authorization: Bearer <token>`, `Content-Type: application/json`
-* **Request JSON:** `{ "inviteCode": "8B5FA3" }`
-* **Success (200) Response JSON:**
-  ```json
-  {
-    "message": "Successfully joined via invite code!",
-    "couple": { "id": "string", "partnerAId": "string", "partnerBId": "string", "isBlocked": false, "blockedById": null, "createdAt": "string", "partnerA": { ... }, "partnerB": { ... } }
-  }
-  ```
-
-### Get Couple Profile
-**`GET /api/ml-couple/profile`**
-* **Headers:** `x-user-id`, `Authorization: Bearer <token>`
-* **Auto-detects couple from `x-user-id` — no coupleId needed.**
-* **Success (200) Response JSON:**
-  ```json
-  {
-    "coupleId": "string",
-    "partnerA": { "id": "string", "displayName": "string", "avatarUrl": "string | null" },
-    "partnerB": { "id": "string", "displayName": "string", "avatarUrl": "string | null" } ,
-    "daysTogether": 365,
-    "anniversaryDate": "string | null",
-    "createdAt": "string",
-    "isBlocked": false
-  }
-  ```
-
-### Update Anniversary Date
-**`PATCH /api/ml-couple/profile`**
-* **Headers:** `x-user-id`, `Authorization: Bearer <token>`, `Content-Type: application/json`
-* **Request JSON:** `{ "anniversaryDate": "2023-06-01T00:00:00.000Z" }`
-* **Success (200) Response JSON:** `{ "success": true, "anniversaryDate": "string" }`
-
-### Get Partner Info (Auto-Detection)
-**`GET /api/ml-couple/partner-email`**
-* **Headers:** `x-user-id`, `Authorization: Bearer <token>`
-* **Auto-detects couple from `x-user-id`.**
-* **Success (200) Response JSON (partner joined):**
-  ```json
-  {
-    "coupleId": "string",
-    "me": { "id": "string", "email": "string", "displayName": "string", "avatarUrl": "string | null" },
-    "partner": { "id": "string", "email": "string", "displayName": "string", "avatarUrl": "string | null" }
-  }
-  ```
-* **Response (waiting for partner):**
-  ```json
-  { "coupleId": "string", "inviteCode": "string", "me": { "..." }, "partner": null, "message": "No partner has joined yet." }
-  ```
-
-### Block Partner
-**`POST /api/ml-couple/block`**
-* **Headers:** `x-user-id`, `Authorization: Bearer <token>`
-* **No body required.**
-* **Success (200) Response JSON:**
-  ```json
-  { "success": true, "message": "Partner has been blocked successfully", "couple": { "isBlocked": true, "blockedById": "your-user-id" } }
-  ```
-> When blocked: all message sends (text + media), uploads, notes, prayers, and all other write operations return **403**.
-
-### Unblock Partner
-**`POST /api/ml-couple/unblock`**
-* **Headers:** `x-user-id`, `Authorization: Bearer <token>`
-* **Only the user who initiated the block can call this.**
-* **Success (200) Response JSON:**
-  ```json
-  { "success": true, "message": "Partner has been unblocked", "couple": { "isBlocked": false, "blockedById": null } }
-  ```
-* **403** if you are not the one who initiated the block.
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/ml-couple/create` | Body: `{ partnerEmail? }`. Creates a couple, returns `inviteCode`. |
+| `POST` | `/api/ml-couple/join` | Body: `{ inviteCode }`. Joins an existing couple. |
+| `GET`  | `/api/ml-couple/profile`| Returns combined profile metrics (days together, etc). |
+| `PATCH`| `/api/ml-couple/profile`| Body: `{ anniversaryDate }`. Update anniversary date. |
+| `GET`  | `/api/ml-couple/partner-email` | Resolves both partners. Returns `me` and `partner`. |
+| `POST` | `/api/ml-couple/invite/resend` | Re-sends the invite email to the partner if pending. |
+| `POST` | `/api/ml-couple/block` | Blocks communication with the partner. |
+| `POST` | `/api/ml-couple/unblock` | Unblocks communication (must be initiated by the blocker). |
 
 ---
 
-## 4. Messaging
+## 4. Messaging & Chat Core
 
-> [!TIP]
-> **`coupleId` is now fully optional.** The backend auto-detects your couple from `x-user-id`. You never need to hardcode or store and pass `coupleId` from the Android app.
+### Standard Unified Messages API (Recommended for New Implementations)
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET`  | `/api/messages` | Cursor paginated log. Params: `limit`, `cursor`. Optional: `coupleId`. |
+| `POST` | `/api/messages` | Send message. Body: `{ content, type, replyToId? }`. |
+| `POST` | `/api/upload` | Media/File upload (multipart/form-data). Body: `file`, `bucket`, etc. |
 
-### Get Messages (Cursor-based Pagination)
-**`GET /api/messages`** ← No query params required!
-* **Headers:** `x-user-id`, `Authorization: Bearer <token>`
-* **Optional Query Params:**
-  * `limit`: number (default: 50, max: 100)
-  * `cursor`: message ID — pass to load older messages
-  * `coupleId`: only needed for admin overrides
-* **Success (200) Response JSON:**
-  ```json
-  {
-    "messages": [ { /* Full Message object */ } ],
-    "nextCursor": "string | null",
-    "hasMore": true
-  }
-  ```
-> Messages are returned **newest first**. Reverse the list before rendering.
+### Legacy ML-Chat Endpoints (Phase 3 format)
+*Most features handle `x-user-id` implicitly.*
 
-### Send Text Message
-**`POST /api/messages`**
-* **Headers:** `x-user-id`, `Authorization: Bearer <token>`, `Content-Type: application/json`
-* **Request JSON:**
-  ```json
-  { "content": "string", "type": "TEXT", "replyToId": "string (optional)" }
-  ```
-  > `coupleId` is **optional** — omit it. Backend finds it from `x-user-id`.
-* **Success (201) Response JSON:** Full `Message` object.
-* Also triggers Supabase Realtime `new_message` broadcast + FCM push to partner.
-* **403** if couple is blocked.
-
-### Mark Messages As Read
-**`POST /api/ml-chat/read`**
-* **Headers:** `x-user-id`, `Authorization: Bearer <token>`, `Content-Type: application/json`
-* **Request JSON:** `{ "messageIds": ["id1", "id2"] }` ← Array, NOT `lastMessageId`
-* **Success (200) Response JSON:** `{ "success": true, "updatedCount": 2 }`
-
-### React to Message
-**`POST /api/ml-chat/react`**
-* **Headers:** `x-user-id`, `Authorization: Bearer <token>`, `Content-Type: application/json`
-* **Request JSON:** `{ "messageId": "string", "emoji": "❤️" }`
-* **Success (200) Response JSON:** `{ "success": true, "action": "add | remove" }`
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET`  | `/api/ml-chat/history` | Similar to `/api/messages` log fetching. |
+| `POST` | `/api/ml-chat/send` | Body: `{ content, type }`. (Fallback/legacy send). |
+| `POST` | `/api/ml-chat/read` | Body: `{ messageIds: string[] }`. |
+| `POST` | `/api/ml-chat/react` | Body: `{ messageId, emoji }`. |
+| `POST` | `/api/ml-chat/reply` | Body: `{ messageId, content, type }`. |
+| `PATCH`| `/api/ml-chat/edit` | Body: `{ id, content }`. Edits an existing sent message. |
+| `POST` | `/api/ml-chat/delete` | Soft deletes message (typically body `{ id }`). |
+| `POST` | `/api/ml-chat/star` | Toggles star on message. |
+| `GET`  | `/api/ml-chat/starred` | List starred messages. |
+| `POST` | `/api/ml-chat/settings`| Update chat specific settings (e.g., bg). |
+| `GET`  | `/api/ml-chat/stats` | Gets message analytics! |
+| `POST` | `/api/ml-chat/archive` | Archives the chat thread. |
+| `POST` | `/api/ml-chat/unarchive`| Unarchives the chat thread. |
+| `POST` | `/api/ml-chat/clear-mine`| Clears chat display local for user. |
+| `GET`  | `/api/ml-chat/export` | Exports chat log to file (e.g. JSON/TXT). |
+| `GET`  | `/api/ml-chat/search` | Search chat for term query params. |
 
 ---
 
 ## 5. Unified Media Uploads
-**`POST /api/upload`**
+
+**`POST /api/upload`** (Primary) or **`POST /api/ml-storage/upload`**
 > [!IMPORTANT]
 > **multipart/form-data** — Do NOT set `Content-Type` manually. Retrofit handles it.
 
 * **Headers:** `x-user-id`, `Authorization: Bearer <token>`
 * **Body Fields:**
   * `file` — File blob (Required)
-  * `bucket` — `"chat-media" | "timeline" | "letters" | "temp"` (Default: `"temp"`)
-  * `coupleId` — **Optional. Omit it — backend auto-detects from `x-user-id`.**
+  * `bucket` — `"chat-media" | "timeline" | "letters" | "temp"`
   * `generateThumbnail` — `"true"` | `"false"`
-  * `caption` — string (optional, for `chat-media`)
-  * `title` — string (optional, for `timeline`)
-  * `description` — string (optional, for `timeline`)
-  * `type` — string (optional, for `timeline` event type)
-  * `letterId` — string (optional, for `letters` attachments)
-* **Success (200) Response JSON:**
-  ```json
-  {
-    "success": true,
-    "file": { "id": "string", "url": "string", "path": "string", "bucket": "string", "size": 1048576, "type": "image/jpeg", "name": "file.jpg" },
-    "thumbnail": { "url": "string", "path": "string" },
-    "message": { /* Full Message object — if bucket was chat-media */ },
-    "timelineEvent": { /* TimelineEvent — if bucket was timeline */ }
-  }
-  ```
-* **403** if couple is blocked.
+  * Metadata fields per type (e.g. `title` and `type` for timeline, `caption` for chat-media)
 
-### Check Upload Status
-**`GET /api/upload/status?id=<file_id>`**
-* **Headers:** `x-user-id`, `Authorization: Bearer <token>`
-* **Success (200) Response JSON:** `{ "id": "string", "url": "string", "type": "string", "size": 1024, "createdAt": "string" }`
+Status checks:
+`GET /api/upload/status?id=<file_id>`
 
 ---
 
-## 6. Couple Features (All Auto-Detect Couple from x-user-id)
+## 6. Couple Core Features
 
-### Notes
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/api/ml-notes/create` | Create note. Body: `{ title?, content, isPinned?, isArchived? }` |
-| `GET`  | `/api/ml-notes/list`   | List all non-archived notes (sorted pinned first) |
-| `PATCH`| `/api/ml-notes/update` | Update note. Body: `{ id, title?, content?, isPinned?, isArchived? }` |
-| `POST` | `/api/ml-notes/pin`    | Toggle pin. Body: `{ id }` |
-| `POST` | `/api/ml-notes/archive`| Archive note. Body: `{ id }` |
-| `DELETE`| `/api/ml-notes/delete`| Delete note. Body: `{ id }` |
+All routes automatically leverage `x-user-id` to identify the couple instance.
 
-### Prayers
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/api/ml-prayer/create` | Body: `{ content, category }`. Category: `"Family \| Relationship \| Career \| Health \| Gratitude"` |
-| `GET`  | `/api/ml-prayer/all`    | List all prayers |
-| `PATCH`| `/api/ml-prayer/<id>`   | Update/mark answered or archived |
-| `DELETE`| `/api/ml-prayer/<id>`  | Delete prayer |
-
-### Gratitude Journal
+### Gratitude Journal (`ml-gratitude`)
 | Method | Endpoint | Description |
 |---|---|---|
 | `POST` | `/api/ml-gratitude/create` | Body: `{ content, date: "ISO 8601", isShared? }` |
-| `GET`  | `/api/ml-gratitude/all`    | List entries |
+| `GET`  | `/api/ml-gratitude/list`   | List entries |
+| `PATCH`| `/api/ml-gratitude/update` | Body: `{ id, content?, date?, isShared? }` |
+| `DELETE`| `/api/ml-gratitude/delete`| Delete an entry |
 
-### Jar of Reasons
+### Jar of Reasons (`ml-jar`)
 | Method | Endpoint | Description |
 |---|---|---|
 | `POST` | `/api/ml-jar/add`          | Body: `{ content, category? }` |
-| `GET`  | `/api/ml-jar/all?limit=20&cursor=<id>` | Cursor-paginated list. Response: `{ data: [...], nextCursor }` |
+| `GET`  | `/api/ml-jar/all`          | Cursor-paginated log |
+| `GET`  | `/api/ml-jar/random`       | Pull a random reason from the jar! |
+| `DELETE`| `/api/ml-jar/delete`      | Delete a specific reason |
+| `GET`  | `/api/ml-jar/search`       | Search terms inside jar |
+| `GET`  | `/api/ml-jar/[id]`         | Get specific reason by ID |
 
-### Timeline
+### Timelines (`ml-timeline`)
 | Method | Endpoint | Description |
 |---|---|---|
-| `POST` | `/api/ml-timeline/create` | Body: `{ title, description?, date: "ISO 8601", type, mediaUrl? }` |
-| `GET`  | `/api/ml-timeline/all`    | List timeline events |
+| `POST` | `/api/ml-timeline/create` | Body: `{ title, description?, date, type, mediaUrl? }` |
+| `GET`  | `/api/ml-timeline/list`   | List timeline events |
+| `DELETE`| `/api/ml-timeline/delete`| Delete event |
 
-### Reflections
+### Letters (`ml-letter`)
 | Method | Endpoint | Description |
 |---|---|---|
-| `POST` | `/api/ml-reflection/create` | Body: `{ content, date: "ISO 8601", isShared? }` |
-| `GET`  | `/api/ml-reflection/all`    | List reflections |
+| `POST` | `/api/ml-letter/create` | Body: `{ title, content, deliverAt, isDraft }` |
+| `GET`  | `/api/ml-letter/list`   | List letters |
+| `GET`  | `/api/ml-letter/draft`  | Retrieve specific offline draft |
+| `POST` | `/api/ml-letter/read`   | Mark a letter as read (opened) |
+
+### Notes & Prayers (`ml-notes`, `ml-prayer`)
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/ml-notes/create` | Body: `{ title?, content, isPinned?, isArchived? }` |
+| `GET`  | `/api/ml-notes/list`   | List active notes |
+| `PATCH`| `/api/ml-notes/update` | Update note |
+| `POST` | `/api/ml-notes/pin`, `.../archive`, `.../delete` | Modify state |
+| `POST` | `/api/ml-prayer/create` | Body: `{ content, category }` |
+| `GET`  | `/api/ml-prayer/list`  | List active prayers |
+| `POST` | `/api/ml-prayer/answered`, `.../archive` | Change prayer state |
+
+### Reflection (`ml-reflection`)
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/ml-reflection/create` | Body: `{ content, date, isShared }` |
+| `GET`  | `/api/ml-reflection/list` | All reflections |
+| `GET`  | `/api/ml-reflection/partner` | List partner's shared reflections |
+
+### Bedtime & Verse (`ml-bedtime`, `ml-verse`, `ml-discussion`)
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET`  | `/api/ml-bedtime/status`, `.../history` | Check routines status |
+| `POST` | `/api/ml-bedtime/complete` | Complete routine checklist |
+| `GET`  | `/api/ml-verse/today`, `.../history` | Specific verse of the day for couples |
+| `POST` | `/api/ml-verse/favorite/[id]` | Toggle favorite on verse |
+| `GET`  | `/api/ml-discussion/today`, `.../history` | Daily discussion topic for couples |
 
 ---
 
-## 7. Real-Time Presence (Typing / Recording / Online)
+## 7. Device Registration & Push Notifications
 
-> [!IMPORTANT]
-> These use **Supabase Realtime Broadcast** — nothing is written to the DB. Subscribe to the `chat_{coupleId}` channel in the Supabase Kotlin SDK.
+> Connect APNs / FCM tokens so push notifications route correctly per user
 
-### Broadcast Presence Event
-**`POST /api/chat/presence`**
-* **Headers:** `x-user-id`, `Authorization: Bearer <token>`, `Content-Type: application/json`
-* **Request JSON:** `{ "type": "typing | recording | online | offline", "isActive": true }`
-* **Success (200):** `{ "success": true, "broadcasted": "typing" }`
-* **Realtime payload on `chat_{coupleId}` channel:**
-  ```json
-  { "event": "presence", "payload": { "userId": "string", "type": "typing", "isActive": true, "timestamp": "ISO 8601" } }
-  ```
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/ml-device/register` | Register FCM token. Body: `{ deviceId, pushToken, platform: "android"\|"ios" }` |
+| `POST` | `/api/ml-notify/register` | Alias for device reg |
+| `PATCH`| `/api/ml-notify/preferences` | Update push enablement settings: `{ notificationsEnabled: boolean, quietHours: {} }` |
+| `GET`  | `/api/ml-notification/history` | In-app view: List recent notification items |
+| `GET`  | `/api/ml-notification/settings`| In-app view: List current generic user settings |
 
 ---
 
-## 8. Online Status (Heartbeat)
+## 8. Real-Time Presence & Status (Heartbeat)
 
-### Update Online Status
-**`POST /api/chat/heartbeat`**
-* Call every **30 seconds** while chat screen is open.
-* **Headers:** `x-user-id`, `Authorization: Bearer <token>`
-* **Success (200):** `{ "success": true, "lastSeen": "ISO 8601" }`
+These are usually driven entirely via Supabase Realtime Channels (`chat_{coupleId}`).
+However, explicit Heartbeat and Presence REST API commands exist.
 
-### Check Partner Online Status
-**`GET /api/chat/heartbeat?partnerId=<partnerId>`**
-* **Headers:** `x-user-id`, `Authorization: Bearer <token>`
-* **Success (200):**
-  ```json
-  { "partnerId": "string", "displayName": "string", "isOnline": true, "lastSeen": "ISO 8601", "lastSeenSeconds": 12 }
-  ```
-> `isOnline` is `true` if partner was seen within the **last 60 seconds**.
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/chat/presence` | Updates realtime activity. Body: `{ type: "typing|recording|online", isActive: true }` |
+| `POST` | `/api/chat/heartbeat` | Marks your Last Seen time as NOW for the chat interface. (Hit every 30s) |
+| `GET`  | `/api/chat/heartbeat?partnerId=...`| Checks if the partner has been active in the last 60s. |
 
 ---
 
-## 9. Admin APIs
+## 9. Admin Operations
 
 > [!WARNING]
-> All admin routes require `x-user-id` to have `role: 'admin'` in the database.
+> All admin routes require the user token (resolved via `x-user-id`) to have `{ role: 'admin' }` in the DB.
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET`  | `/api/admin/users`    | List all users |
-| `POST` | `/api/admin/users`    | Promote/demote: `{ action: "promote\|demote", email }` |
-| `GET`  | `/api/admin/couples`  | List all couples with partner info |
-| `GET`  | `/api/admin/logs`     | List audit logs |
+| `GET`  | `/api/admin/users` | List users |
+| `POST` | `/api/admin/users/[id]` | Generic modifier on ID |
+| `GET`  | `/api/admin/couples` | List couples (includes IDs/status) |
+| `POST` | `/api/admin/couples/[id]` | Intervene/Manage Couple |
+| `GET`  | `/api/admin/logs` | Fetch backend Audit Logs |
+| `GET`  | `/api/admin/announcements` | Global broadcast alerts setup |
+| `GET`  | `/api/admin/stats` | System summary KPIs |
+| `GET`  | `/api/admin/reports` | Get user abuse/bug reports |
+| `POST` | `/api/admin/reports/[id]/resolve` | Mark report resolved |
+| `GET`  | `/api/admin/content/[type]/[id]` | Inspect specific content node |
 
 ---
 
-## 10. Frontend Supabase Realtime Setup
+## Frontend Integration Tips
+
+### Optional CoupleId
+Never worry about manually syncing `coupleId` via explicit Android intents between screens. Provide `x-user-id` everywhere, and the backend naturally infers what context to alter.
+
+### Realtime
+Maintain your subscriptions to the generic `chat_{coupleId}` topic inside Supabase when a user enters a coupled screen (or globally for toast notifications). Do this by decoding the JSON.
 
 ```kotlin
-// In ChatViewModel — subscribe when screen opens, unsubscribe on close
 val channel = supabase.channel("chat_${coupleId}")
-
-channel.broadcastFlow<JsonObject>("new_message").onEach { payload ->
-    val msg = Json.decodeFromJsonElement<MessageDto>(payload["message"]!!)
-    messageDao.insert(msg.toEntity())
-}.launchIn(viewModelScope)
-
-channel.broadcastFlow<JsonObject>("read_receipt").onEach { payload ->
-    val ids = payload["messageIds"]!!.jsonArray.map { it.jsonPrimitive.content }
-    messageDao.markRead(ids)
-}.launchIn(viewModelScope)
-
-channel.broadcastFlow<JsonObject>("presence").onEach { payload ->
-    val type = payload["type"]?.jsonPrimitive?.content
-    val isActive = payload["isActive"]?.jsonPrimitive?.boolean ?: false
-    when (type) {
-        "typing"    -> _isPartnerTyping.value = isActive
-        "recording" -> _isPartnerRecording.value = isActive
-        "online"    -> _isPartnerOnline.value = isActive
-    }
-}.launchIn(viewModelScope)
-
+channel.broadcastFlow<JsonObject>("new_message").onEach { ... }
+channel.broadcastFlow<JsonObject>("presence").onEach { ... }
 channel.subscribe()
 ```
-
----
-
-## ⚠️ Common Mistakes
-
-| Wrong ❌ | Correct ✅ |
-|---|---|
-| Passing `coupleId` in every request | Omit it — backend auto-detects from `x-user-id` |
-| Setting `Content-Type: multipart/form-data` manually | Let OkHttp set it automatically via `@Multipart` |
-| `"lastMessageId": "abc"` in mark-read | `"messageIds": ["abc"]` (array!) |
-| Polling for new messages | Subscribe to Supabase Realtime `chat_{coupleId}` |
-| Showing Unblock for wrong user | Only show if `blockedById == currentUserId` |
-| Calling couple features before resolving couple | Call `GET /api/ml-couple/partner-email` first on startup |
-| Sending the reset PIN from API response | The PIN is email-only, never in the response body |

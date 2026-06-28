@@ -147,3 +147,47 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to send message' }, { status: 500 })
   }
 }
+
+// DELETE /api/messages?id=<messageId>
+// Soft-deletes a message (sets isDeleted = true). Only the original sender can delete.
+export async function DELETE(request: NextRequest) {
+  try {
+    const userId = request.headers.get('x-user-id')
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const { searchParams } = new URL(request.url)
+    const messageId = searchParams.get('id')
+
+    if (!messageId) {
+      return NextResponse.json({ error: 'id query parameter is required' }, { status: 400 })
+    }
+
+    const message = await prisma.message.findUnique({ where: { id: messageId } })
+
+    if (!message) {
+      return NextResponse.json({ error: 'Message not found' }, { status: 404 })
+    }
+
+    if (message.senderId !== userId) {
+      return NextResponse.json({ error: 'Unauthorized: You can only delete your own messages' }, { status: 403 })
+    }
+
+    const updated = await prisma.message.update({
+      where: { id: messageId },
+      data: { isDeleted: true, content: '' },
+    })
+
+    // Broadcast deletion to partner so their UI updates in realtime
+    const couple = await prisma.couple.findFirst({
+      where: { OR: [{ partnerAId: userId }, { partnerBId: userId }] },
+    })
+    if (couple) {
+      broadcastToChannel(`chat_${couple.id}`, 'message_deleted', { messageId })
+    }
+
+    return NextResponse.json({ success: true, message: updated }, { status: 200 })
+  } catch (error) {
+    console.error('Error deleting message:', error)
+    return NextResponse.json({ error: 'Failed to delete message' }, { status: 500 })
+  }
+}

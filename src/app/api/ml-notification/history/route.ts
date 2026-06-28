@@ -66,3 +66,32 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
+
+// DELETE /api/ml-notification/history?id=<notificationId>  — delete one notification
+// DELETE /api/ml-notification/history                       — clear ALL notifications for the user
+export async function DELETE(req: Request) {
+  try {
+    const userId = req.headers.get('x-user-id');
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get('id');
+
+    if (id) {
+      // Delete a specific notification (must belong to this user)
+      const notification = await prisma.notification.findFirst({ where: { id, userId } });
+      if (!notification) {
+        return NextResponse.json({ error: 'Notification not found or unauthorized' }, { status: 404 });
+      }
+      await prisma.notification.delete({ where: { id } });
+      return NextResponse.json({ success: true, message: 'Notification deleted' }, { status: 200 });
+    }
+
+    // No id — clear ALL notifications for this user
+    const { count } = await prisma.notification.deleteMany({ where: { userId } });
+    return NextResponse.json({ success: true, message: `Cleared ${count} notification(s)` }, { status: 200 });
+  } catch (error) {
+    console.error('[NOTIFICATION_DELETE]', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}

@@ -1,0 +1,1060 @@
+---
+ROUTE: src\app\api\admin\announcement\route.ts
+REQ VARS: title, message, priority, expiresAt
+RES BODIES:
+ - { error: { code: 'BAD_REQUEST', message: 'Missing required fields' } }, { status: 400 }
+ - { data: announcement }, { status: 201 }
+ - { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, { status: 500 }
+
+---
+ROUTE: src\app\api\admin\announcements\route.ts
+REQ VARS: 
+RES BODIES:
+ - { data: announcements }, { status: 200 }
+ - { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, { status: 500 }
+
+---
+ROUTE: src\app\api\admin\content\[type]\[id]\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: { code: 'BAD_REQUEST', message: 'Unknown content type' } }, { status: 400 }
+ - { message: `${type} content deleted successfully` }, { status: 200 }
+ - { error: { code: 'INTERNAL_ERROR', message: 'Internal server error or content not found' } }, { status: 500 }
+
+---
+ROUTE: src\app\api\admin\couples\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - couples
+ -  { error: 'Failed to fetch couples' }, { status: 500 } 
+
+---
+ROUTE: src\app\api\admin\couples\[id]\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: { code: 'NOT_FOUND', message: 'Couple not found' } }, { status: 404 }
+ - { data: { id: couple.id, partnerA: couple.partnerA, partnerB: couple.partnerB, anniversaryDate: couple.anniversaryDate, createdAt: couple.createdAt, s
+ - { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, { status: 500 }
+ - { error: { code: 'NOT_FOUND', message: 'Couple not found' } }, { status: 404 }
+ - { message: 'Couple successfully dissolved and data redacted' }, { status: 200 }
+ - { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, { status: 500 }
+
+---
+ROUTE: src\app\api\admin\logs\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - logs
+ -  { error: 'Failed to fetch audit logs' }, { status: 500 } 
+
+---
+ROUTE: src\app\api\admin\reports\route.ts
+REQ VARS: 
+RES BODIES:
+ - { data: mappedReports, nextCursor }, { status: 200 }
+ - { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, { status: 500 }
+
+---
+ROUTE: src\app\api\admin\reports\[id]\resolve\route.ts
+REQ VARS: action, adminNotes
+RES BODIES:
+ - { error: { code: 'BAD_REQUEST', message: 'Invalid action' } }, { status: 400 }
+ - { error: { code: 'NOT_FOUND', message: 'Report not found' } }, { status: 404 }
+ - { data: updatedReport }, { status: 200 }
+ - { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, { status: 500 }
+
+---
+ROUTE: src\app\api\admin\stats\route.ts
+REQ VARS: 
+RES BODIES:
+ - { data: { users: { total: totalUsers, active7d: activeUsers, new30d: newUsers }, couples: { total: totalCouples, active: activeCouples }, content: { m
+ - { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, { status: 500 }
+
+---
+ROUTE: src\app\api\admin\users\route.ts
+REQ VARS: action, email
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - users
+ -  { error: 'Failed to fetch users' }, { status: 500 } 
+ - { error: 'Unauthorized' }, { status: 401 }
+ -  { error: 'action and email are required' }, { status: 400 } 
+ -  { error: 'Invalid action. Use "promote" or "demote"' }, { status: 400 } 
+ - result
+ -  { error: error.message || 'Failed to update user' }, { status: 500 } 
+
+---
+ROUTE: src\app\api\admin\users\[id]\route.ts
+REQ VARS: role, isActive
+RES BODIES:
+ - { error: { code: 'NOT_FOUND', message: 'User not found' } }, { status: 404 }
+ - { data: { id: user.id, displayName: user.displayName, email: user.email, role: user.role, isActive: user.isActive, createdAt: user.createdAt, coupleSt
+ - { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, { status: 500 }
+ - { error: { code: 'NOT_FOUND', message: 'User not found' } }, { status: 404 }
+ - { data: updatedUser }, { status: 200 }
+ - { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, { status: 500 }
+ - { error: { code: 'BAD_REQUEST', message: 'Admin password is required to delete a user' } }, { status: 400 }
+ - { error: { code: 'BAD_REQUEST', message: 'Admin has no local password to verify' } }, { status: 400 }
+ - { error: { code: 'FORBIDDEN', message: 'Invalid admin password' } }, { status: 403 }
+ - { error: { code: 'NOT_FOUND', message: 'User not found' } }, { status: 404 }
+ - { message: 'User permanently deleted' }, { status: 200 }
+ - { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, { status: 500 }
+
+---
+ROUTE: src\app\api\auth\forgot-password\route.ts
+REQ VARS: email
+RES BODIES:
+ - { error: 'email is required' }, { status: 400 }
+ - { success: true, message: 'If an account exists, a reset link was sent.' }, { status: 200 }
+ - { error: { code: 'EMAIL_FAILURE', message: 'Failed to send reset email. Please try again later.' } }, { status: 500 }
+ - { success: true, message: 'If an account exists, a reset link was sent.' }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\auth\google\route.ts
+REQ VARS: idToken
+RES BODIES:
+ - { error: 'idToken is required' }, { status: 400 }
+ - { error: 'Invalid Google Token' }, { status: 401 }
+ - { message: 'Google Login successful', user: { id: user.id, email: user.email, displayName: user.displayName, avatarUrl: user.avatarUrl }, accessToken,
+ - { error: 'Google Verification failed' }, { status: 401 }
+
+---
+ROUTE: src\app\api\auth\login\route.ts
+REQ VARS: email, password
+RES BODIES:
+ - { error: parsed.error.issues[0].message }, { status: 400 }
+ - { error: 'Invalid credentials' }, { status: 401 }
+ - { error: 'Please sign in with Google' }, { status: 401 }
+ - { error: 'Invalid credentials' }, { status: 401 }
+ -  { message: 'Login successful', user: { id: user.id, email: user.email, displayName: user.displayName }, accessToken, }, { status: 200 } 
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\auth\logout\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'Refresh token is required to logout' }, { status: 400 }
+ - { message: 'Logged out successfully' }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\auth\logout-all\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { message: 'Successfully logged out from all devices' }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\auth\refresh\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: 'Refresh token not found' }, { status: 401 }
+ - { error: 'Invalid refresh token' }, { status: 403 }
+ - { error: 'Refresh token revoked or not found' }, { status: 403 }
+ - { accessToken }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\auth\register\route.ts
+REQ VARS: email, password, displayName
+RES BODIES:
+ - { error: 'Content-Type must be application/json', reqId }, { status: 400 }
+ - { error: 'Invalid or empty JSON body', reqId }, { status: 400 }
+ - { error: 'Invalid or empty JSON body', reqId }, { status: 400 }
+ - { error: parsed.error.issues[0].message, reqId }, { status: 400 }
+ - { error: 'Email already exists', reqId }, { status: 400 }
+ - { error: 'Email already exists', reqId }, { status: 400 }
+ - { error: 'Internal server error', reqId }, { status: 500 }
+ - { error: 'Failed to set refresh cookie', reqId }, { status: 500 }
+ -  { message: 'Registration successful', user: { id: user.id, email: user.email, displayName: user.displayName }, accessToken, reqId, }, { status: 201 }
+ - { error: 'Internal server error', reqId }, { status: 500 }
+
+---
+ROUTE: src\app\api\auth\reset-password\route.ts
+REQ VARS: email, token, newPassword
+RES BODIES:
+ - { error: 'email, token, and newPassword are required' }, { status: 400 }
+ - { error: 'Password must be at least 6 characters' }, { status: 400 }
+ - { error: 'Invalid or expired token' }, { status: 400 }
+ - { error: 'Invalid or expired token' }, { status: 400 }
+ - { error: 'Token has expired' }, { status: 400 }
+ - { success: true, message: 'Password has been reset successfully' }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\chat\heartbeat\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { success: true, lastSeen: user.updatedAt.toISOString(
+ - { error: 'Internal server error' }, { status: 500 }
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'partnerId is required' }, { status: 400 }
+ - { error: 'Partner not found' }, { status: 404 }
+ - { partnerId: partner.id, displayName: partner.displayName, isOnline, lastSeen: partner.updatedAt.toISOString(
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\chat\presence\route.ts
+REQ VARS: type, isActive
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ -  { error: `type must be one of: ${validTypes.join(', '
+ - { error: 'No couple found for this user' }, { status: 404 }
+ - { success: true, broadcasted: type }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\health\db\route.ts
+REQ VARS: 
+RES BODIES:
+ - { ok: true, result }, { status: 200 }
+ - { ok: false, error: String(error
+
+---
+ROUTE: src\app\api\messages\media\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ -  { error: 'File and coupleId are required' }, { status: 400 } 
+ -  { error: 'Unauthorized: Not part of this couple' }, { status: 403 } 
+ - message, { status: 201 }
+ -  { error: 'Failed to send media message' }, { status: 500 } 
+
+---
+ROUTE: src\app\api\messages\route.ts
+REQ VARS: content, type, replyToId
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'No couple found for this user' }, { status: 404 }
+ - { error: 'Unauthorized: Not part of this couple' }, { status: 403 }
+ - { messages, nextCursor, hasMore: nextCursor !== null }
+ - { error: 'Failed to fetch messages' }, { status: 500 }
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'content is required' }, { status: 400 }
+ - { error: 'No couple found for this user' }, { status: 404 }
+ - { error: 'Communication is currently blocked' }, { status: 403 }
+ - message, { status: 201 }
+ - { error: 'Failed to send message' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-bedtime\complete\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'You are not in a couple' }, { status: 400 }
+ - { error: 'Ritual already completed today.' }, { status: 400 }
+ - { success: true, event }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-bedtime\status\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'You are not in a couple' }, { status: 400 }
+ - { status: { reflectionCompleted: !!reflection, gratitudeCompleted: !!gratitude, prayerCompleted: !!prayer, ritualCompleted: !!completionEvent, } }, { 
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-chat\archive\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'Couple not found' }, { status: 404 }
+ - { success: true, archive }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-chat\clear-mine\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'Couple not found' }, { status: 404 }
+ - { success: true, message: 'Chat cleared for you' }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-chat\delete\route.ts
+REQ VARS: messageId, type = 'FOR_ME'
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'messageId is required' }, { status: 400 }
+ - { error: 'Message not found' }, { status: 404 }
+ - { error: 'You can only delete your own messages for everyone' }, { status: 403 }
+ - { error: 'Delete window expired (1 hour limit
+ - { error: 'FOR_ME individual delete not fully mapped in Prisma. Use clear-mine for bulk' }, { status: 501 }
+ - { error: 'Invalid delete type' }, { status: 400 }
+ - { success: true }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-chat\edit\route.ts
+REQ VARS: id, content
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: parsed.error.issues[0].message }, { status: 400 }
+ - { error: 'Message not found or unauthorized' }, { status: 404 }
+ - { message: updatedMessage }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-chat\export\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'Couple not found' }, { status: 404 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-chat\history\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'You are not in a couple' }, { status: 400 }
+ - { messages: formattedMessages }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-chat\media\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'Couple not found' }, { status: 404 }
+ - { success: true, gallery }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-chat\message\[id]\route.ts
+REQ VARS: content
+RES BODIES:
+ - { error: { code: 'UNAUTHORIZED', message: 'Unauthorized' } }, { status: 401 }
+ - { error: { code: 'NOT_FOUND', message: 'Message not found' } }, { status: 404 }
+ - { data: message }, { status: 200 }
+ - { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, { status: 500 }
+ - { error: { code: 'UNAUTHORIZED', message: 'Unauthorized' } }, { status: 401 }
+ - { error: { code: 'BAD_REQUEST', message: 'Content is required' } }, { status: 400 }
+ - { error: { code: 'NOT_FOUND', message: 'Message not found' } }, { status: 404 }
+ - { error: { code: 'FORBIDDEN', message: 'You can only edit your own messages' } }, { status: 403 }
+ - { error: { code: 'BAD_REQUEST', message: 'Edit time expired (>5 minutes
+ - { data: updatedMessage }, { status: 200 }
+ - { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, { status: 500 }
+ - { error: { code: 'UNAUTHORIZED', message: 'Unauthorized' } }, { status: 401 }
+ - { error: { code: 'NOT_FOUND', message: 'Message not found' } }, { status: 404 }
+ - { error: { code: 'FORBIDDEN', message: 'You can only delete your own messages' } }, { status: 403 }
+ - { data: updatedMessage }, { status: 200 }
+ - { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-chat\react\route.ts
+REQ VARS: messageId, emoji
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'messageId and emoji are required' }, { status: 400 }
+ - { error: 'Invalid emoji. Please use a supported reaction.' }, { status: 400 }
+ - { error: 'Message not found' }, { status: 404 }
+ - { success: true, action: actionType }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-chat\read\route.ts
+REQ VARS: messageIds
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'messageIds array is required' }, { status: 400 }
+ - { success: true, updatedCount: 0 }, { status: 200 }
+ - { success: true, updatedCount: receipts.length }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-chat\reply\route.ts
+REQ VARS: messageId, content, type = 'TEXT', mediaUrl
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'Couple not found' }, { status: 404 }
+ - { error: 'Missing required reply payload parameters' }, { status: 400 }
+ - { error: 'Original message not found' }, { status: 404 }
+ - { success: true, message }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-chat\search\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'Search query is required' }, { status: 400 }
+ - { error: 'coupleId is required' }, { status: 400 }
+ - { error: 'Forbidden' }, { status: 403 }
+ - { success: true, data: messages, pagination: { total, page, limit } }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-chat\send\route.ts
+REQ VARS: type, content, mediaUrl, fileName, fileSize, duration
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'Couple not found' }, { status: 404 }
+ - { error: 'Invalid or missing type' }, { status: 400 }
+ - { error: 'Content is required for TEXT messages' }, { status: 400 }
+ - { error: 'Media URL is required for media messages' }, { status: 400 }
+ - { success: true, message }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-chat\settings\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { success: true, settings }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-chat\star\route.ts
+REQ VARS: messageId
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'messageId is required' }, { status: 400 }
+ - { success: true, star }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'messageId is required' }, { status: 400 }
+ - { success: true }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-chat\starred\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { success: true, messages }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-chat\stats\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'Couple not found' }, { status: 404 }
+ - { success: true, stats }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-chat\unarchive\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'Couple not found' }, { status: 404 }
+ - { success: true }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-couple\block\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'No couple found for this user' }, { status: 404 }
+ - { error: 'Couple not found' }, { status: 404 }
+ - { error: 'Couple is already blocked' }, { status: 400 }
+ - { success: true, message: 'Partner has been blocked successfully', couple: updatedCouple }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-couple\create\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'You are already in a couple connection' }, { status: 400 }
+ - { error: { code: 'EMAIL_FAILURE', message: 'Couple created but failed to send invite email. Please try resending from profile.' }, inviteCode, couple 
+ - { message: 'Pending couple created successfully!', inviteCode, couple }, { status: 201 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-couple\invite\resend\route.ts
+REQ VARS: partnerEmail
+RES BODIES:
+ - { error: { code: 'UNAUTHORIZED', message: 'Unauthorized' } }, { status: 401 }
+ - { error: { code: 'BAD_REQUEST', message: 'partnerEmail is required to resend invite' } }, { status: 400 }
+ - { error: { code: 'BAD_REQUEST', message: 'No pending couple connection found to resend invite for' } }, { status: 400 }
+ - { error: { code: 'EXTERNAL_ERROR', message: 'Failed to send invite email' } }, { status: 500 }
+ - { success: true, message: 'Invite resent successfully', inviteCode: newInviteCode }, { status: 200 }
+ - { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-couple\join\route.ts
+REQ VARS: partnerEmail, anniversaryDate
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'You are already in a couple.' }, { status: 400 }
+ - { error: 'Invalid or expired invite code' }, { status: 404 }
+ - { error: 'This invite code has already been used' }, { status: 400 }
+ - { error: 'You cannot use your own invite code' }, { status: 400 }
+ - { message: 'Successfully joined via invite code!', couple }, { status: 200 }
+ - { error: parsed.error.issues[0].message }, { status: 400 }
+ - { error: 'Partner email or invite code is required' }, { status: 400 }
+ - { error: 'Partner not found' }, { status: 404 }
+ - { error: 'You cannot form a couple with yourself.' }, { status: 400 }
+ - { error: 'Your partner is already in a couple.' }, { status: 400 }
+ - { message: 'Couple linked successfully!', couple }, { status: 201 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-couple\partner-email\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'No couple found for this user' }, { status: 404 }
+ - { coupleId: couple.id, inviteCode: couple.inviteCode, me, partner: null, message: 'No partner has joined yet. Share your invite code!', }
+ - { coupleId: couple.id, me, partner: { id: partner.id, email: partner.email, displayName: partner.displayName, avatarUrl: partner.avatarUrl, }, }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-couple\profile\route.ts
+REQ VARS: anniversaryDate
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'Couple not found' }, { status: 404 }
+ - { coupleId: couple.id, partnerA: formatUserWithAvatar(couple.partnerA
+ - { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, { status: 500 }
+ - { error: { code: 'UNAUTHORIZED', message: 'Unauthorized' } }, { status: 401 }
+ - { error: { code: 'BAD_REQUEST', message: 'anniversaryDate is required' } }, { status: 400 }
+ - { error: { code: 'NOT_FOUND', message: 'Couple not found' } }, { status: 404 }
+ - { success: true, anniversaryDate: updatedCouple.anniversaryDate }, { status: 200 }
+ - { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-couple\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: { code: 'UNAUTHORIZED', message: 'Unauthorized' } }, { status: 401 }
+ - { error: { code: 'NOT_FOUND', message: 'You are not part of any couple' } }, { status: 404 }
+ - { success: true, message: 'Couple connection and all shared data deleted' }, { status: 200 }
+ - { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-couple\unblock\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'No couple found for this user' }, { status: 404 }
+ - { error: 'Couple not found' }, { status: 404 }
+ - { error: 'Couple is not blocked' }, { status: 400 }
+ - { error: 'Only the user who initiated the block can unblock' }, { status: 403 }
+ - { success: true, message: 'Partner has been unblocked', couple: updatedCouple }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-device\register\route.ts
+REQ VARS: platform, deviceName, fcmToken
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'Platform is required' }, { status: 400 }
+ - { success: true, device }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-discussion\history\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: { code: 'UNAUTHORIZED', message: 'Unauthorized' } }, { status: 401 }
+ - { error: { code: 'NOT_FOUND', message: 'Couple connection not found' } }, { status: 404 }
+ - { data: items, nextCursor }, { status: 200 }
+ - { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-discussion\today\route.ts
+REQ VARS: 
+RES BODIES:
+ - { topic: { question, type, date: topic.date } }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-gratitude\create\route.ts
+REQ VARS: content, date, isShared
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'You are not in a couple' }, { status: 400 }
+ - { error: parsed.error.issues[0].message }, { status: 400 }
+ - { entry }, { status: 201 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-gratitude\delete\route.ts
+REQ VARS: id
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: parsed.error.issues[0].message }, { status: 400 }
+ - { error: 'Gratitude entry not found or unauthorized' }, { status: 404 }
+ - { success: true }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-gratitude\list\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'You are not in a couple' }, { status: 400 }
+ - { entries }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-gratitude\update\route.ts
+REQ VARS: id, content, date, isShared
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: parsed.error.issues[0].message }, { status: 400 }
+ - { error: 'Gratitude entry not found or unauthorized' }, { status: 404 }
+ - { entry: updatedEntry }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-jar\add\route.ts
+REQ VARS: content, category
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'You are not in a couple' }, { status: 400 }
+ - { error: parsed.error.issues[0].message }, { status: 400 }
+ - { reason }, { status: 201 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-jar\all\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: { code: 'UNAUTHORIZED', message: 'Unauthorized' } }, { status: 401 }
+ - { error: { code: 'NOT_FOUND', message: 'Couple connection not found' } }, { status: 404 }
+ - { data: items, nextCursor }, { status: 200 }
+ - { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-jar\delete\route.ts
+REQ VARS: id
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: parsed.error.issues[0].message }, { status: 400 }
+ - { error: 'Reason not found or unauthorized' }, { status: 404 }
+ - { success: true }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-jar\random\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'You are not in a couple' }, { status: 400 }
+ - { error: 'The jar is empty' }, { status: 404 }
+ - { reason: randomReason }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-jar\search\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'You are not in a couple' }, { status: 400 }
+ - { reasons }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-jar\[id]\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: { code: 'UNAUTHORIZED', message: 'Unauthorized' } }, { status: 401 }
+ - { error: { code: 'NOT_FOUND', message: 'Jar entry not found' } }, { status: 404 }
+ - { error: { code: 'FORBIDDEN', message: 'You can only delete your own jar entries' } }, { status: 403 }
+ - { error: { code: 'FORBIDDEN', message: 'Invalid couple membership' } }, { status: 403 }
+ - null, { status: 204 }
+ - { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-letter\create\route.ts
+REQ VARS: title, content, deliverAt, isDraft
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'You are not in a couple' }, { status: 400 }
+ - { error: parsed.error.issues[0].message }, { status: 400 }
+ - { message: 'Letter scheduled successfully', letter }, { status: 201 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-letter\draft\route.ts
+REQ VARS: id, title, content, deliverAt, isDraft
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: parsed.error.issues[0].message }, { status: 400 }
+ - { error: 'Letter not found or unauthorized' }, { status: 404 }
+ - { error: 'Letter is already finalized.' }, { status: 400 }
+ - { letter: updatedLetter }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-letter\list\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'You are not in a couple' }, { status: 400 }
+ - { letters: formattedLetters }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-letter\read\route.ts
+REQ VARS: id
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: parsed.error.issues[0].message }, { status: 400 }
+ - { error: 'Letter not found or unauthorized' }, { status: 404 }
+ - { error: 'You cannot mark your own letter as read' }, { status: 400 }
+ - { error: 'Cannot read letter before its scheduled delivery date' }, { status: 400 }
+ - { letter: updatedLetter }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-notes\archive\route.ts
+REQ VARS: id
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: parsed.error.issues[0].message }, { status: 400 }
+ - { error: 'Note not found or unauthorized' }, { status: 404 }
+ - { error: 'Only the creator can archive this note' }, { status: 403 }
+ - { note: updatedNote }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-notes\create\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'You are not in a couple' }, { status: 400 }
+ - { error: parsed.error.issues[0].message }, { status: 400 }
+ - { note }, { status: 201 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-notes\delete\route.ts
+REQ VARS: id
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: parsed.error.issues[0].message }, { status: 400 }
+ - { error: 'Note not found or unauthorized' }, { status: 404 }
+ - { success: true }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-notes\list\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'You are not in a couple' }, { status: 400 }
+ - { notes: formattedNotes }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-notes\pin\route.ts
+REQ VARS: id
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: parsed.error.issues[0].message }, { status: 400 }
+ - { error: 'Note not found or unauthorized' }, { status: 404 }
+ - { note: updatedNote }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-notes\update\route.ts
+REQ VARS: id, title, content
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: parsed.error.issues[0].message }, { status: 400 }
+ - { error: 'Note not found or unauthorized' }, { status: 404 }
+ - { note: updatedNote }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-notes\[id]\route.ts
+REQ VARS: title, content
+RES BODIES:
+ - { error: { code: 'UNAUTHORIZED', message: 'Unauthorized' } }, { status: 401 }
+ - { error: { code: 'NOT_FOUND', message: 'Note not found' } }, { status: 404 }
+ - { error: { code: 'FORBIDDEN', message: 'Invalid couple membership' } }, { status: 403 }
+ - { data: note }, { status: 200 }
+ - { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, { status: 500 }
+ - { error: { code: 'UNAUTHORIZED', message: 'Unauthorized' } }, { status: 401 }
+ - { error: { code: 'NOT_FOUND', message: 'Note not found' } }, { status: 404 }
+ - { error: { code: 'FORBIDDEN', message: 'You can only edit notes for your own couple' } }, { status: 403 }
+ - { data: updatedNote }, { status: 200 }
+ - { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, { status: 500 }
+ - { error: { code: 'UNAUTHORIZED', message: 'Unauthorized' } }, { status: 401 }
+ - { error: { code: 'NOT_FOUND', message: 'Note not found' } }, { status: 404 }
+ - { error: { code: 'FORBIDDEN', message: 'You can only delete notes for your own couple' } }, { status: 403 }
+ - { message: 'Note deleted successfully' }, { status: 200 }
+ - { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-notification\history\route.ts
+REQ VARS: notificationId, markAllRead
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { success: true, data: notifications, unreadCount, pagination: { total, page, limit, pages: Math.ceil(total / limit
+ - { error: 'Internal server error' }, { status: 500 }
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { success: true, updatedCount: count }
+ - { success: true }
+ - { error: 'Provide notificationId or markAllRead:true' }, { status: 400 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-notification\settings\route.ts
+REQ VARS: pushEnabled, dailyReminder, chatNotifications, partnerActivity
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { success: true, data: settings }
+ - { error: 'Internal server error' }, { status: 500 }
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { success: true, data: settings }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-notify\preferences\route.ts
+REQ VARS: pushEnabled, dailyReminder, chatNotifications, partnerActivity
+RES BODIES:
+ - { error: { code: 'UNAUTHORIZED', message: 'Unauthorized' } }, { status: 401 }
+ - { data: settings }, { status: 200 }
+ - { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, { status: 500 }
+ - { error: { code: 'UNAUTHORIZED', message: 'Unauthorized' } }, { status: 401 }
+ - { data: updatedSettings }, { status: 200 }
+ - { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-notify\register\route.ts
+REQ VARS: fcmToken
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: parsed.error.issues[0].message }, { status: 400 }
+ - { success: true, user: { id: user.id } }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-prayer\answered\route.ts
+REQ VARS: id
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: parsed.error.issues[0].message }, { status: 400 }
+ - { error: 'Prayer not found or unauthorized' }, { status: 404 }
+ - { prayer: updatedPrayer }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-prayer\archive\route.ts
+REQ VARS: id
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: parsed.error.issues[0].message }, { status: 400 }
+ - { error: 'Prayer not found or unauthorized' }, { status: 404 }
+ - { prayer: updatedPrayer }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-prayer\create\route.ts
+REQ VARS: content, category
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'You are not in a couple' }, { status: 400 }
+ - { error: parsed.error.issues[0].message }, { status: 400 }
+ - { prayer }, { status: 201 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-prayer\list\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'You are not in a couple' }, { status: 400 }
+ - { prayers: formattedPrayers }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-prayer\[id]\route.ts
+REQ VARS: content, category
+RES BODIES:
+ - { error: { code: 'UNAUTHORIZED', message: 'Unauthorized' } }, { status: 401 }
+ - { error: { code: 'NOT_FOUND', message: 'Prayer not found' } }, { status: 404 }
+ - { error: { code: 'FORBIDDEN', message: 'Invalid couple membership' } }, { status: 403 }
+ - { data: { ...prayer, answeredAt: prayer.isAnswered ? prayer.updatedAt : null } }, { status: 200 }
+ - { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, { status: 500 }
+ - { error: { code: 'UNAUTHORIZED', message: 'Unauthorized' } }, { status: 401 }
+ - { error: { code: 'NOT_FOUND', message: 'Prayer not found' } }, { status: 404 }
+ - { error: { code: 'FORBIDDEN', message: 'You can only edit prayers for your own couple' } }, { status: 403 }
+ - { data: updatedPrayer }, { status: 200 }
+ - { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, { status: 500 }
+ - { error: { code: 'UNAUTHORIZED', message: 'Unauthorized' } }, { status: 401 }
+ - { error: { code: 'NOT_FOUND', message: 'Prayer not found' } }, { status: 404 }
+ - { error: { code: 'FORBIDDEN', message: 'You can only delete prayers for your own couple' } }, { status: 403 }
+ - { message: 'Prayer deleted successfully' }, { status: 200 }
+ - { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-reflection\create\route.ts
+REQ VARS: content, date, isShared
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'You are not in a couple' }, { status: 400 }
+ - { error: parsed.error.issues[0].message }, { status: 400 }
+ - { reflection }, { status: 201 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-reflection\list\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'You are not in a couple' }, { status: 400 }
+ - { reflections: formattedReflections }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-reflection\partner\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'You are not in a couple' }, { status: 400 }
+ - { reflections }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-storage\upload\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'Missing file or type parameter' }, { status: 400 }
+ - { error: 'Invalid media type' }, { status: 400 }
+ - { error: `File too large for type ${type}. Maximum is ${limit / 1024 / 1024}MB` }, { status: 413 }
+ - { error: 'Failed to upload to storage: ' + uploadError.message }, { status: 500 }
+ - { success: true, url: data.publicUrl, size: file.size, originalName: file.name }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-timeline\create\route.ts
+REQ VARS: title, description, date, type, mediaUrl
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'You are not in a couple' }, { status: 400 }
+ - { error: parsed.error.issues[0].message }, { status: 400 }
+ - { event }, { status: 201 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-timeline\delete\route.ts
+REQ VARS: id
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: parsed.error.issues[0].message }, { status: 400 }
+ - { error: 'Event not found or unauthorized' }, { status: 404 }
+ - { success: true }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-timeline\list\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'You are not in a couple' }, { status: 400 }
+ - { events: formattedEvents }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-verse\favorite\[id]\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: { code: 'UNAUTHORIZED', message: 'Unauthorized' } }, { status: 401 }
+ - { error: { code: 'NOT_FOUND', message: 'Couple connection not found' } }, { status: 404 }
+ - { error: { code: 'NOT_FOUND', message: 'Verse not found' } }, { status: 404 }
+ - { message: 'Verse removed from favorites', isFavorite: false }, { status: 200 }
+ - { message: 'Verse added to favorites', isFavorite: true, data: newFavorite }, { status: 200 }
+ - { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-verse\history\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: { code: 'UNAUTHORIZED', message: 'Unauthorized' } }, { status: 401 }
+ - { error: { code: 'NOT_FOUND', message: 'Couple connection not found' } }, { status: 404 }
+ - { data: items, nextCursor }, { status: 200 }
+ - { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, { status: 500 }
+
+---
+ROUTE: src\app\api\ml-verse\today\route.ts
+REQ VARS: 
+RES BODIES:
+ - { verse: { reference: reference || '', text: text || cachedVerse.content, version: 'WEB' } }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\upload\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'File not found' }, { status: 404 }
+ - { signedUrl }
+ - { error: 'Invalid request' }, { status: 400 }
+ -  { error: 'Failed to process request' }, { status: 500 } 
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'No couple found for this user' }, { status: 404 }
+ -  { error: 'File is required' }, { status: 400 } 
+ -  { error: 'Invalid bucket' }, { status: 400 } 
+ -  { error: 'coupleId is required for this bucket' }, { status: 400 } 
+ -  { error: 'Communication is currently blocked' }, { status: 403 } 
+ -  { error: 'Use /api/avatar endpoint for avatar uploads' }, { status: 400 } 
+ -  { error: 'Invalid bucket configuration' }, { status: 400 } 
+ - { success: true, file: { id: mediaFile.id, url: uploadResult.url, path: uploadResult.path, bucket, size: file.size, type: file.type, name: file.name, 
+ -  { error: error.message }, { status: 413 } 
+ -  { error: error.message }, { status: 415 } 
+ -  { error: 'Upload failed', details: error.message || 'Unknown error' }, { status: 500 } 
+
+---
+ROUTE: src\app\api\upload\status\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ -  { error: 'File ID required' }, { status: 400 } 
+ -  { error: 'File not found' }, { status: 404 } 
+ - { id: file.id, url: file.url, type: file.type, size: file.size, createdAt: file.createdAt, }
+ -  { error: 'Failed to get file status' }, { status: 500 } 
+
+---
+ROUTE: src\app\api\user\account\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: { code: 'UNAUTHORIZED', message: 'Unauthorized' } }, { status: 401 }
+ - { success: true }, { status: 200 }
+ - { error: { code: 'INTERNAL_ERROR', message: 'Internal server error during account deletion' } }, { status: 500 }
+
+---
+ROUTE: src\app\api\user\avatar\route.ts
+REQ VARS: 
+RES BODIES:
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'No avatar file provided' }, { status: 400 }
+ - { error: validationError }, { status: 415 }
+ - { error: 'Failed to upload avatar via Supabase', details: uploadError }, { status: 500 }
+ - { success: true, avatarUrl: updatedUser.avatarUrl, message: 'Avatar uploaded successfully', }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+ - { error: 'Unauthorized' }, { status: 401 }
+ - { error: 'User not found' }, { status: 404 }
+ - { error: 'Failed to delete avatar from storage', details: deleteError }, { status: 500 }
+ - { success: true, message: 'Avatar deleted successfully' }, { status: 200 }
+ - { error: 'Internal server error' }, { status: 500 }
+
+---
+ROUTE: src\app\api\user\profile\route.ts
+REQ VARS: displayName, avatarUrl
+RES BODIES:
+ - { error: { code: 'UNAUTHORIZED', message: 'Unauthorized' } }, { status: 401 }
+ - { error: { code: 'NOT_FOUND', message: 'User not found' } }, { status: 404 }
+ - formatUserWithAvatar(user
+ - { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, { status: 500 }
+ - { error: { code: 'UNAUTHORIZED', message: 'Unauthorized' } }, { status: 401 }
+ - { error: { code: 'BAD_REQUEST', message: 'Invalid or missing displayName' } }, { status: 400 }
+ - formatUserWithAvatar(updatedUser
+ - { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, { status: 500 }
