@@ -23,7 +23,7 @@ export async function uploadFile(
     .upload(path, file, {
       contentType,
       cacheControl: '3600',
-      upsert: false,
+      upsert: true,
     })
 
   if (error) throw error

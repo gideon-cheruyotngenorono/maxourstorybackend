@@ -4,6 +4,10 @@ This exhaustive table/reference explains the exact JSON body structures expected
 
 > **Remember:** All protected endpoints require the `x-user-id` header. **Endpoints under `ml-*` auto-resolve `coupleId` from this header.**
 
+> **Last updated:** All DELETE endpoints are now implemented. Where a route says `DELETE`, the actual HTTP method `DELETE` must be used (not GET). Query params like `?id=X` are used for resource identification on DELETE requests.
+
+> 📱 **Media & File Upload Guide:** For a full breakdown of every upload flow, MIME types per bucket, Retrofit code, and realtime events — see **[MEDIA_INTEGRATION_GUIDE.md](./MEDIA_INTEGRATION_GUIDE.md)**.
+
 ### `POST/PATCH` `/api/admin/announcement`
 
 **Request JSON expected:**
@@ -308,38 +312,77 @@ users
 
 ---
 
-### `GET/DELETE` `/api/messages/media`
+### `POST` `/api/messages/media`
 
-**Request Body:** None required.
+**Request:** `multipart/form-data`
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `file` | File | ✅ | The media file to send |
+| `type` | string | ✅ | `IMAGE`, `VIDEO`, `AUDIO`, `FILE` |
 
 **Success Response (2xx):**
 ```javascript
-message
+message // the created Message record with mediaUrl
 ```
 
 ---
 
-### `POST/PATCH` `/api/messages`
+### `GET` `/api/messages`
+
+**Query Params (all optional):**
+
+| Param | Type | Notes |
+|---|---|---|
+| `limit` | number | Max messages to return (default 50, max 100) |
+| `cursor` | string | Message ID to paginate from (older messages) |
+| `coupleId` | string | Optional — auto-detected from token if omitted |
+
+**Success Response (2xx):**
+```javascript
+{ messages, nextCursor, hasMore }
+```
+
+---
+
+### `POST` `/api/messages`
 
 **Request JSON expected:**
 ```json
 {
   "content": "string",
   "type": "string",
-  "replyToId": "string (UUID)",
+  "replyToId": "string (UUID)"
 }
 ```
 
 **Success Response (2xx):**
 ```javascript
-message
+message // the created Message record
 ```
 
 ---
 
-### `GET/DELETE` `/api/ml-bedtime/complete`
+### `DELETE` `/api/messages?id=<messageId>`
 
-**Request Body:** None required.
+**Query Param:**
+
+| Param | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | ✅ | ID of the message to delete |
+
+> Soft-deletes the message (`isDeleted = true`, content cleared). Only the **original sender** can delete. Broadcasts a `message_deleted` event to the partner via Supabase Realtime.
+
+**Success Response (2xx):**
+```javascript
+{ success: true, message: updatedMessage }, { status: 200 }
+```
+
+---
+
+### `POST` `/api/ml-bedtime/complete`
+
+**Request Body:** None required. (Logs today's bedtime ritual completion for the couple.)
 
 **Success Response (2xx):**
 ```javascript
@@ -348,13 +391,30 @@ message
 
 ---
 
-### `GET/DELETE` `/api/ml-bedtime/status`
+### `GET` `/api/ml-bedtime/status`
 
 **Request Body:** None required.
 
 **Success Response (2xx):**
 ```javascript
-{ status: { reflectionCompleted: !!reflection, gratitudeCompleted: !!gratitude, prayerCompleted: !!prayer, ritualCompleted: !!completionEvent, } }
+{ status: { reflectionCompleted: !!reflection, gratitudeCompleted: !!gratitude, prayerCompleted: !!prayer, ritualCompleted: !!completionEvent } }
+```
+
+---
+
+### `DELETE` `/api/ml-bedtime/log?id=<eventId>`
+
+**Query Param:**
+
+| Param | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | ✅ | ID of the bedtime `TimelineEvent` to remove |
+
+> Only couple members can delete their own bedtime logs. Cannot be used to delete arbitrary timeline events.
+
+**Success Response (2xx):**
+```javascript
+{ success: true, message: 'Bedtime log entry removed' }, { status: 200 }
 ```
 
 ---
@@ -712,20 +772,40 @@ message
 
 ---
 
-### `POST/PATCH` `/api/ml-device/register`
+### `POST` `/api/ml-device/register`
 
 **Request JSON expected:**
 ```json
 {
   "platform": "string",
   "deviceName": "string",
-  "fcmToken": "string",
+  "fcmToken": "string"
 }
 ```
+
+> Registers or updates a device. If an `fcmToken` matching an existing device is found, it updates `lastSeen`. Also sets the user's primary `fcmToken`.
 
 **Success Response (2xx):**
 ```javascript
 { success: true, device }, { status: 200 }
+```
+
+---
+
+### `DELETE` `/api/ml-device/register?fcmToken=<token>` or `?deviceId=<id>`
+
+**Query Params (provide one):**
+
+| Param | Type | Required | Notes |
+|---|---|---|---|
+| `fcmToken` | string | ⚠️ one of | The FCM token to unregister |
+| `deviceId` | string | ⚠️ one of | The device record ID to unregister |
+
+> Unregisters the device and removes its push token. If the deleted device's token was the user's primary FCM token, automatically promotes the next most-recently-seen device's token.
+
+**Success Response (2xx):**
+```javascript
+{ success: true, message: 'Device unregistered' }, { status: 200 }
 ```
 
 ---
@@ -893,7 +973,7 @@ null
 
 ---
 
-### `POST/PATCH` `/api/ml-letter/create`
+### `POST` `/api/ml-letter/create`
 
 **Request JSON expected:**
 ```json
@@ -901,7 +981,7 @@ null
   "title": "string",
   "content": "string",
   "deliverAt": "string (ISO Date)",
-  "isDraft": "boolean",
+  "isDraft": "boolean"
 }
 ```
 
@@ -912,7 +992,24 @@ null
 
 ---
 
-### `POST/PATCH` `/api/ml-letter/draft`
+### `DELETE` `/api/ml-letter/delete?id=<letterId>`
+
+**Query Param:**
+
+| Param | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | ✅ | ID of the letter or draft to delete |
+
+> Only the **author** of the letter can delete it.
+
+**Success Response (2xx):**
+```javascript
+{ success: true, message: 'Letter deleted' }, { status: 200 }
+```
+
+---
+
+### `PUT` `/api/ml-letter/draft`
 
 **Request JSON expected:**
 ```json
@@ -921,7 +1018,7 @@ null
   "title": "string",
   "content": "string",
   "deliverAt": "string (ISO Date)",
-  "isDraft": "boolean",
+  "isDraft": "boolean"
 }
 ```
 
@@ -932,7 +1029,7 @@ null
 
 ---
 
-### `GET/DELETE` `/api/ml-letter/list`
+### `GET` `/api/ml-letter/list`
 
 **Request Body:** None required.
 
@@ -943,12 +1040,12 @@ null
 
 ---
 
-### `POST/PATCH` `/api/ml-letter/read`
+### `PATCH` `/api/ml-letter/read`
 
 **Request JSON expected:**
 ```json
 {
-  "id": "string",
+  "id": "string"
 }
 ```
 
@@ -1064,19 +1161,57 @@ null
 
 ---
 
-### `POST/PATCH` `/api/ml-notification/history`
+### `GET` `/api/ml-notification/history`
+
+**Query Params (all optional):**
+
+| Param | Type | Notes |
+|---|---|---|
+| `page` | number | Page number (default 1) |
+| `limit` | number | Results per page (default 20, max 50) |
+
+**Success Response (2xx):**
+```javascript
+{ success: true, data: notifications, unreadCount, pagination: { total, page, limit, pages } }
+```
+
+---
+
+### `POST` `/api/ml-notification/history` *(Mark as read)*
 
 **Request JSON expected:**
 ```json
 {
   "notificationId": "string (UUID)",
-  "markAllRead": "string",
+  "markAllRead": true
 }
 ```
 
+> Provide `notificationId` to mark one, or `markAllRead: true` to mark all.
+
 **Success Response (2xx):**
 ```javascript
-{ success: true, data: notifications, unreadCount, pagination: { total, page, limit, pages: Math.ceil(total / limit
+{ success: true, updatedCount: number }
+```
+
+---
+
+### `DELETE` `/api/ml-notification/history?id=<notificationId>`
+
+**Query Param:**
+
+| Param | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | ❌ optional | Omit to clear **all** notifications for the user |
+
+> Pass `?id=X` to delete one specific notification. Omit `id` entirely to clear the full notification history.
+
+**Success Response (2xx):**
+```javascript
+// Single delete:
+{ success: true, message: 'Notification deleted' }, { status: 200 }
+// Clear all:
+{ success: true, message: 'Cleared N notification(s)' }, { status: 200 }
 ```
 
 ---
@@ -1119,18 +1254,33 @@ null
 
 ---
 
-### `POST/PATCH` `/api/ml-notify/register`
+### `POST` `/api/ml-notify/register`
 
 **Request JSON expected:**
 ```json
 {
-  "fcmToken": "string",
+  "fcmToken": "string"
 }
 ```
+
+> Sets the user's primary FCM token for push notifications.
 
 **Success Response (2xx):**
 ```javascript
 { success: true, user: { id: user.id } }, { status: 200 }
+```
+
+---
+
+### `DELETE` `/api/ml-notify/register`
+
+**Request Body:** None required.
+
+> Clears the user's primary FCM token. **Call this on logout** to stop push notifications being sent to a signed-out session.
+
+**Success Response (2xx):**
+```javascript
+{ success: true, message: 'Push token unregistered' }, { status: 200 }
 ```
 
 ---
@@ -1167,13 +1317,13 @@ null
 
 ---
 
-### `POST/PATCH` `/api/ml-prayer/create`
+### `POST` `/api/ml-prayer/create`
 
 **Request JSON expected:**
 ```json
 {
   "content": "string",
-  "category": "string",
+  "category": "string"
 }
 ```
 
@@ -1184,7 +1334,24 @@ null
 
 ---
 
-### `GET/DELETE` `/api/ml-prayer/list`
+### `DELETE` `/api/ml-prayer/delete?id=<prayerId>`
+
+**Query Param:**
+
+| Param | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | ✅ | ID of the prayer to permanently delete |
+
+> Hard-deletes the prayer. Only the **creator** can delete. Use `/archive` for soft removal.
+
+**Success Response (2xx):**
+```javascript
+{ success: true, message: 'Prayer deleted' }, { status: 200 }
+```
+
+---
+
+### `GET` `/api/ml-prayer/list`
 
 **Request Body:** None required.
 
@@ -1195,15 +1362,9 @@ null
 
 ---
 
-### `POST/PATCH` `/api/ml-prayer/[id]`
+### `GET` `/api/ml-prayer/[id]`
 
-**Request JSON expected:**
-```json
-{
-  "content": "string",
-  "category": "string",
-}
-```
+**Request Body:** None. Path parameter provides ID.
 
 **Success Response (2xx):**
 ```javascript
@@ -1212,14 +1373,14 @@ null
 
 ---
 
-### `POST/PATCH` `/api/ml-reflection/create`
+### `POST` `/api/ml-reflection/create`
 
 **Request JSON expected:**
 ```json
 {
   "content": "string",
   "date": "string",
-  "isShared": "boolean",
+  "isShared": "boolean"
 }
 ```
 
@@ -1230,7 +1391,24 @@ null
 
 ---
 
-### `GET/DELETE` `/api/ml-reflection/list`
+### `DELETE` `/api/ml-reflection/delete?id=<reflectionId>`
+
+**Query Param:**
+
+| Param | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | ✅ | ID of the reflection to delete |
+
+> Only the **owner** of the reflection can delete it.
+
+**Success Response (2xx):**
+```javascript
+{ success: true, message: 'Reflection deleted' }, { status: 200 }
+```
+
+---
+
+### `GET` `/api/ml-reflection/list`
 
 **Request Body:** None required.
 
@@ -1241,7 +1419,7 @@ null
 
 ---
 
-### `GET/DELETE` `/api/ml-reflection/partner`
+### `GET` `/api/ml-reflection/partner`
 
 **Request Body:** None required.
 
@@ -1252,13 +1430,37 @@ null
 
 ---
 
-### `GET/DELETE` `/api/ml-storage/upload`
+### `POST` `/api/ml-storage/upload`
 
-**Request Body:** None required.
+**Request:** `multipart/form-data`
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `file` | File | ✅ | The file to upload |
+| `type` | string | ✅ | `IMAGE` (10MB), `VIDEO` (50MB), `AUDIO` (20MB), `FILE` (25MB) |
 
 **Success Response (2xx):**
 ```javascript
-{ success: true, url: data.publicUrl, size: file.size, originalName: file.name }, { status: 200 }
+{ success: true, url: data.publicUrl, path: filePath, size: file.size, originalName: file.name }, { status: 200 }
+```
+
+> **Save the `path` field from this response** — you'll need it to call the DELETE endpoint.
+
+---
+
+### `DELETE` `/api/ml-storage/upload?path=<filePath>`
+
+**Query Param:**
+
+| Param | Type | Required | Notes |
+|---|---|---|---|
+| `path` | string | ✅ | The storage path returned in the upload response |
+
+> Security enforced: path must start with `chat/{userId}/` — you can only delete your own files.
+
+**Success Response (2xx):**
+```javascript
+{ success: true, message: 'File deleted from storage' }, { status: 200 }
 ```
 
 ---
@@ -1376,13 +1578,34 @@ null
 
 ---
 
-### `GET/DELETE` `/api/user/avatar`
+### `POST` `/api/user/avatar`
 
-**Request Body:** None required.
+**Request:** `multipart/form-data`
 
-**Success Response (2xx):**
-```javascript
-{ success: true, avatarUrl: updatedUser.avatarUrl, message: 'Avatar uploaded successfully', }, { status: 200 }
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `avatar` | File | ✅ | Field name **must** be `"avatar"` (not `"file"`) |
+
+**Allowed MIME Types:** `image/jpeg`, `image/png`, `image/gif`, `image/webp`, `image/svg+xml`, `image/heic`, `image/heif`, `image/avif` — **Max 10MB**
+
+**Success Response `200`:**
+```json
+{
+  "success": true,
+  "avatarUrl": "https://xyz.supabase.co/storage/v1/object/public/avatars/.../avatar.webp",
+  "message": "Avatar uploaded successfully"
+}
+```
+
+---
+
+### `DELETE` `/api/user/avatar`
+
+**Request Body:** None required. Removes avatar from storage and clears `avatarUrl` on the user record.
+
+**Success Response `200`:**
+```json
+{ "success": true, "message": "Avatar deleted successfully" }
 ```
 
 ---
@@ -1404,3 +1627,20 @@ formatUserWithAvatar(user
 
 ---
 
+## Changelog
+
+### 2026-06-28 — DELETE Endpoints Added
+
+The following DELETE endpoints were added. All require the `x-user-id` header.
+
+| New Endpoint | Notes |
+|---|---|
+| `DELETE /api/messages?id=X` | Soft-deletes a message (sender only), broadcasts `message_deleted` realtime event |
+| `DELETE /api/ml-letter/delete?id=X` | Permanently deletes a letter or draft (author only) |
+| `DELETE /api/ml-reflection/delete?id=X` | Permanently deletes a reflection (owner only) |
+| `DELETE /api/ml-prayer/delete?id=X` | Permanently deletes a prayer (creator only) |
+| `DELETE /api/ml-bedtime/log?id=X` | Removes a bedtime ritual log entry (couple member only) |
+| `DELETE /api/ml-storage/upload?path=X` | Deletes a file from Supabase storage (own files only) |
+| `DELETE /api/ml-device/register?fcmToken=X` | Unregisters a device push token |
+| `DELETE /api/ml-notify/register` | Clears primary FCM token — call on logout |
+| `DELETE /api/ml-notification/history?id=X` | Delete one notification; omit `id` to clear all |
